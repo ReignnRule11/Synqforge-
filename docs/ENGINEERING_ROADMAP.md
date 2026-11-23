@@ -25,6 +25,9 @@
 - [x] Versioned project artifact API with immutable append-only document versions
 - [x] Project document history and editor UI for briefs, PRDs, stories, roadmaps, architecture, and other artifact types
 - [x] Artifact validation, version allocation, and role/tenant isolation PostgreSQL tests
+- [x] Versioned project artifact API with immutable append-only document versions
+- [x] Project document history and editor UI for briefs, PRDs, stories, roadmaps, architecture, and other artifact types
+- [x] Artifact validation and PostgreSQL role/tenant isolation tests
 - [ ] Browser-level end-to-end tests against a live Auth.js and PostgreSQL environment
 
 ## Phase 2 — Product Intelligence
