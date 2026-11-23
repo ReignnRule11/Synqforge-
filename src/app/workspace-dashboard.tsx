@@ -62,6 +62,11 @@ export default function WorkspaceDashboard({ initialWorkspaces, userName, userEm
   const [projectTarget, setProjectTarget] = useState<Project["target"]>("web");
   const [projectCreating, setProjectCreating] = useState(false);
   const [projectError, setProjectError] = useState("");
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const [nextProjectStatus, setNextProjectStatus] = useState("");
+  const [statusSaving, setStatusSaving] = useState(false);
+  const [detailError, setDetailError] = useState("");
+
 
   const activeWorkspace = workspaces.find((workspace) => workspace.id === activeWorkspaceId) ?? null;
   useEffect(() => {
@@ -83,6 +88,56 @@ export default function WorkspaceDashboard({ initialWorkspaces, userName, userEm
     () => workspaces.filter((workspace) => workspace.name.toLowerCase().includes(search.toLowerCase())),
     [workspaces, search],
   );
+
+  const nextStatuses: Record<string, string[]> = {
+    idea: ["discovery", "archived"],
+    discovery: ["idea", "planning", "archived"],
+    planning: ["discovery", "design", "architecture", "archived"],
+    design: ["planning", "architecture", "building", "archived"],
+    architecture: ["planning", "design", "building", "archived"],
+    building: ["architecture", "verification", "archived"],
+    verification: ["building", "launch", "archived"],
+    launch: ["verification", "operations", "archived"],
+    operations: ["building", "archived"],
+    archived: ["idea"],
+  };
+
+  async function openProject(project: Project) {
+    setSelectedProject(project);
+    setNextProjectStatus(project.status);
+    setDetailError("");
+    try {
+      const response = await fetch(`/api/projects/${encodeURIComponent(project.id)}`);
+      const payload = await response.json().catch(() => ({})) as { project?: Project; error?: string };
+      if (!response.ok || !payload.project) throw new Error(payload.error || "Project details could not be loaded.");
+      setSelectedProject(payload.project);
+      setNextProjectStatus(payload.project.status);
+    } catch (cause) {
+      setDetailError(cause instanceof Error ? cause.message : "Project details could not be loaded.");
+    }
+  }
+
+  async function saveProjectStatus() {
+    if (!selectedProject || !activeWorkspace || statusSaving || activeWorkspace.role === "viewer") return;
+    setStatusSaving(true);
+    setDetailError("");
+    try {
+      const response = await fetch(`/api/projects/${encodeURIComponent(selectedProject.id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: nextProjectStatus }),
+      });
+      const payload = await response.json().catch(() => ({})) as { project?: Project; error?: string };
+      if (!response.ok || !payload.project) throw new Error(payload.error || "Project status could not be updated.");
+      setSelectedProject(payload.project);
+      setProjects((current) => current.map((item) => item.id === payload.project!.id ? payload.project! : item));
+      setNotice("Project lifecycle status updated.");
+    } catch (cause) {
+      setDetailError(cause instanceof Error ? cause.message : "Project status could not be updated.");
+    } finally {
+      setStatusSaving(false);
+    }
+  }
 
   async function createWorkspace(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -186,7 +241,7 @@ export default function WorkspaceDashboard({ initialWorkspaces, userName, userEm
           <div className="usage">
             <div className="usage-title"><span>Workspace status</span><span>Foundation</span></div>
             <div className="usage-track"><div /></div>
-            <p>Workspace persistence is connected. Product creation is the next milestone.</p>
+            <p>Workspace and project records are persisted. Lifecycle controls are active.</p>
           </div>
           <button className="nav-link" type="button" onClick={() => setNotice("Documentation is not connected yet.")}><CircleHelp size={17} /><span>Help & documentation</span></button>
           <button className="nav-link" type="button" onClick={() => setNotice("Workspace settings will be enabled after the authorized settings API is implemented.")}><Settings2 size={17} /><span>Workspace settings</span></button>
@@ -239,7 +294,7 @@ export default function WorkspaceDashboard({ initialWorkspaces, userName, userEm
                   <div className="project-top"><div className="project-icon"><FolderKanban size={19} /></div><span className="role-chip">{project.status}</span></div>
                   <h3>{project.name}</h3><p className="project-desc">{project.description || "No project description yet."}</p>
                   <div className="workspace-card-meta"><span className="role-chip">{project.target.replace("_", " + ")}</span><span>Updated {new Date(project.updated_at).toLocaleDateString()}</span></div>
-                  <div className="project-footer"><span>Workspace project</span><span>Idea stage</span></div>
+                  <div className="project-footer"><span>Workspace project</span><button type="button" onClick={() => void openProject(project)}>View details <ArrowUpRight size={13} /></button></div>
                 </article>)}
               </div>
             ) : <div className="activity-empty"><div className="empty-icon"><FolderKanban size={22} /></div><b>{activeWorkspace ? "No projects in this workspace yet." : "Select or create a workspace first."}</b><p>{activeWorkspace?.role === "viewer" ? "You have read-only access to this workspace." : "Create the first project to begin its product lifecycle."}</p></div>}
@@ -278,13 +333,34 @@ export default function WorkspaceDashboard({ initialWorkspaces, userName, userEm
               <div className="lifecycle">{[["01", "Discover", "Research"], ["02", "Define", "PRD"], ["03", "Design", "UX"], ["04", "Architect", "System"], ["05", "Build", "Code"], ["06", "Verify", "QA"], ["07", "Launch", "Operate"]].map(([number, title, detail]) => <div className="life-step" key={number}><div className="life-icon"><span>{number}</span></div><b>{title}</b><small>{detail}</small></div>)}</div>
             </section>
             <section className="panel activity-panel">
-              <div className="panel-head"><div><h2>Project engine</h2><p>Persistent project records are the next build step.</p></div><span className="tag">IN PROGRESS</span></div>
-              <div className="activity-empty"><div className="empty-icon"><FolderKanban size={22} /></div><b>No projects are connected yet.</b><p>This dashboard no longer displays sample projects. Project creation will be enabled after its authenticated API and tenant-isolation tests are complete.</p></div>
+              <div className="panel-head"><div><h2>Project engine</h2><p>Open a project to inspect its state and advance it through valid lifecycle stages.</p></div><span className="tag">IN PROGRESS</span></div>
+              <div className="activity-empty"><div className="empty-icon"><FolderKanban size={22} /></div><b>No project activity yet.</b><p>Project details and lifecycle history will appear as projects advance through their stages.</p></div>
             </section>
           </div>
           <div className="footer-note"><span><Atom size={14} /> SynqForge workspace foundation</span><span>Authenticated data · PostgreSQL-backed</span></div>
         </div>
       </main>
+
+      {selectedProject && (
+        <div className="overlay" onMouseDown={(event) => { if (event.target === event.currentTarget && !statusSaving) setSelectedProject(null); }}>
+          <section className="modal" aria-labelledby="project-detail-title">
+            <div className="modal-head"><div className="modal-icon"><FolderKanban size={20} /></div><button className="close" type="button" aria-label="Close project details" disabled={statusSaving} onClick={() => setSelectedProject(null)}>×</button></div>
+            <h2 id="project-detail-title">{selectedProject.name}</h2>
+            <p>{selectedProject.description || "No project description has been added."}</p>
+            <div className="workspace-card-meta"><span className="role-chip">{selectedProject.target.replace("_", " + ")}</span><span>Created {new Date(selectedProject.created_at).toLocaleDateString()}</span></div>
+            <label htmlFor="project-status">Lifecycle status</label>
+            <select id="project-status" className="modal-input" value={nextProjectStatus} disabled={activeWorkspace?.role === "viewer" || statusSaving} onChange={(event) => setNextProjectStatus(event.target.value)}>
+              <option value={selectedProject.status}>{selectedProject.status}</option>
+              {(nextStatuses[selectedProject.status] ?? []).map((status) => <option key={status} value={status}>{status}</option>)}
+            </select>
+            {detailError && <p className="form-error" role="alert">{detailError}</p>}
+            {activeWorkspace?.role === "viewer" ? <small className="modal-disclaimer">Viewer access is read-only. You can inspect this project but cannot change its lifecycle status.</small> : (
+              <button className="primary modal-submit" type="button" disabled={statusSaving || nextProjectStatus === selectedProject.status} onClick={() => void saveProjectStatus()}>{statusSaving ? "Saving status…" : "Save lifecycle status"} <ArrowUpRight size={16} /></button>
+            )}
+            <small className="modal-disclaimer">Transitions are validated by the server. PostgreSQL row-level security enforces workspace editor permissions.</small>
+          </section>
+        </div>
+      )}
 
       {projectOpen && (
         <div className="overlay" onMouseDown={(event) => { if (event.target === event.currentTarget && !projectCreating) setProjectOpen(false); }}>
