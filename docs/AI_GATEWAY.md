@@ -35,7 +35,6 @@ Each request has a 30-second timeout. HTTP errors, malformed provider responses,
 
 ## Data handling and limitations
 
-Sending a project brief to a provider transmits that content to the configured external service. A future authenticated route must authorize project membership and editor role before provider invocation, disclose the selected provider, and append only validated output. This gateway does not yet add a user-facing generation endpoint or automatic artifact write.
 
 ## Verification
 
