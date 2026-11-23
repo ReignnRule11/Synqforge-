@@ -36,7 +36,6 @@
 - Discovery, personas, problem framing, assumptions, validation plan
 - PRD, stories, acceptance criteria, roadmap artifacts
 - Sources and uncertainty labels
-- [ ] Browser-level end-to-end tests against a live Auth.js and PostgreSQL environment
 
 ## Phase 3 — Design & Architecture
 - UX flow generation and editable design specification
