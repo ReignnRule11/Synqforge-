@@ -97,7 +97,7 @@ function setup(scenario: Scenario = {}) {
       assert.equal(input.name, project.name);
       if (scenario.providerFailure) throw new Error("provider unavailable");
       if (scenario.invalidPrd) return { ...validPrd, unexpected: "rejected" } as never;
-      if (scenario.oversizedPrd) return { ...validPrd, goals: Array.from({ length: 20 }, () => "x".repeat(1000)) } as never;
+      if (scenario.oversizedPrd) return { ...validPrd, ...Object.fromEntries(["targetUsers", "goals", "nonGoals", "userStories", "functionalRequirements", "acceptanceCriteria", "assumptions", "risks", "openQuestions"].map((field) => [field, Array.from({ length: 20 }, () => "x".repeat(1000))])) } as never;
       return validPrd;
     },
   };
