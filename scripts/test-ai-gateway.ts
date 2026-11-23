@@ -57,38 +57,29 @@ async function main() {
   assert.throws(() => createProviderConfig({ AI_PROVIDER: "anthropic", AI_API_KEY: "x", AI_MODEL: "x" }), /ANTHROPIC_API_KEY/);
 
   const config: ProviderConfig = { apiKey: "secret-test", model: "model-test", endpoint: "https://provider.example.test/api" };
-  async function exercise(provider: TextGenerationProvider, expectedHeader: string, expectedBodyKey: string) {
-    let seenHeaders: HeadersInit | undefined;
-    let seenBody: Record<string, unknown> | undefined;
-    const fakeFetch: typeof fetch = async (_input, init) => {
-      seenHeaders = init?.headers;
-      seenBody = JSON.parse(String(init?.body)) as Record<string, unknown>;
-      return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(valid) } }] }), { status: 200 });
-    };
-    await provider.generate({ system: "system", prompt: "prompt", maxOutputTokens: 500 });
-    assert.ok(seenHeaders);
-    assert.ok(new Headers(seenHeaders).has(expectedHeader));
-    assert.ok(seenBody && expectedBodyKey in seenBody);
-  }
-  await exercise(new OpenAICompatibleProvider(config, async (_input, init) => {
+  await new OpenAICompatibleProvider(config, async (_input, init) => {
     assert.equal(new Headers(init?.headers).get("authorization"), "Bearer secret-test");
     const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
     assert.equal(body.model, "model-test");
+    assert.ok(Array.isArray(body.messages));
     return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(valid) } }] }), { status: 200 });
-  }), "authorization", "messages");
-  await exercise(new AnthropicProvider(config, async (_input, init) => {
+  }).generate({ system: "system", prompt: "prompt", maxOutputTokens: 500 });
+
+  await new AnthropicProvider(config, async (_input, init) => {
     assert.equal(new Headers(init?.headers).get("x-api-key"), "secret-test");
     assert.equal(new Headers(init?.headers).get("anthropic-version"), "2023-06-01");
     const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
     assert.equal(body.model, "model-test");
+    assert.ok(Array.isArray(body.messages));
     return new Response(JSON.stringify({ content: [{ type: "text", text: JSON.stringify(valid) }] }), { status: 200 });
-  }), "x-api-key", "messages");
-  await exercise(new GeminiProvider(config, async (_input, init) => {
+  }).generate({ system: "system", prompt: "prompt", maxOutputTokens: 500 });
+
+  await new GeminiProvider(config, async (_input, init) => {
     assert.equal(new Headers(init?.headers).get("x-goog-api-key"), "secret-test");
     const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
-    assert.ok(body.systemInstruction && body.generationConfig);
+    assert.ok(body.systemInstruction && body.generationConfig && body.contents);
     return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(valid) }] } }] }), { status: 200 });
-  }), "x-goog-api-key", "contents");
+  }).generate({ system: "system", prompt: "prompt", maxOutputTokens: 500 });
 
   console.log("AI gateway contract and multi-provider adapter tests passed.");
 }
