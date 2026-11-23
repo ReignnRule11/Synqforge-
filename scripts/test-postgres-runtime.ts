@@ -175,14 +175,17 @@ async function run() {
   });
   assert.equal(memberArtifact.version, 2, "workspace editor can append a subsequent artifact version");
 
-  const viewerArtifactInsert = await withAuthenticatedUserTransaction(runtime, viewerUser, async (client) =>
-    client.query(
-      `INSERT INTO project_artifacts (workspace_id, project_id, artifact_type, title, version, content, created_by)
-       VALUES ($1, $2, 'prd', 'Viewer forbidden', 3, '{}'::jsonb, current_setting('app.user_id')::uuid) RETURNING id`,
-      [workspaceA, ownerProject.id],
+  await assert.rejects(
+    withAuthenticatedUserTransaction(runtime, viewerUser, async (client) =>
+      client.query(
+        `INSERT INTO project_artifacts (workspace_id, project_id, artifact_type, title, version, content, created_by)
+         VALUES ($1, $2, 'prd', 'Viewer forbidden', 3, '{}'::jsonb, current_setting('app.user_id')::uuid)`,
+        [workspaceA, ownerProject.id],
+      ),
     ),
+    { code: "42501" },
+    "viewer cannot append project artifact versions",
   );
-  assert.equal(viewerArtifactInsert.rows.length, 0, "viewer cannot append project artifact versions");
 
   const crossTenantArtifacts = await withAuthenticatedUserTransaction(runtime, userB, async (client) =>
     client.query("SELECT id FROM project_artifacts WHERE project_id = $1", [ownerProject.id]),
