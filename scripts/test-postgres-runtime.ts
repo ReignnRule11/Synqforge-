@@ -179,13 +179,10 @@ async function run() {
   });
   assert.equal(memberTransition, "planning", "member editor can update a project lifecycle status");
 
-  await assert.rejects(
-    withAuthenticatedUserTransaction(runtime, viewerUser, async (client) =>
-      client.query("UPDATE projects SET status = 'design' WHERE id = $1", [ownerProject.id]),
-    ),
-    { code: "42501" },
-    "viewer must not update project lifecycle status",
+  const viewerUpdate = await withAuthenticatedUserTransaction(runtime, viewerUser, async (client) =>
+    client.query("UPDATE projects SET status = 'design' WHERE id = $1 RETURNING id", [ownerProject.id]),
   );
+  assert.equal(viewerUpdate.rows.length, 0, "viewer RLS policy must silently filter project lifecycle updates");
 
   const crossTenantUpdate = await withAuthenticatedUserTransaction(runtime, userB, async (client) =>
     client.query("UPDATE projects SET status = 'archived' WHERE id = $1 RETURNING id", [ownerProject.id]),
