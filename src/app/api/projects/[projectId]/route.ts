@@ -74,6 +74,15 @@ export async function PATCH(request: Request, { params }: RouteContext) {
       );
       const project = current.rows[0] as { id: string; workspace_id: string; status: ProjectStatus } | undefined;
       if (!project) return { kind: "not_found" as const };
+      const membership = await client.query(
+        `SELECT role FROM workspace_memberships
+         WHERE workspace_id = $1
+           AND user_id = current_setting('app.user_id')::uuid`,
+        [project.workspace_id],
+      );
+      if (!membership.rows[0] || membership.rows[0].role === "viewer") {
+        return { kind: "forbidden" as const };
+      }
       if (!canTransitionProject(project.status, nextStatus)) {
         return { kind: "invalid_transition" as const, currentStatus: project.status };
       }
@@ -109,6 +118,7 @@ export async function PATCH(request: Request, { params }: RouteContext) {
     });
 
     if (result.kind === "not_found") return jsonError("Project not found.", 404);
+    if (result.kind === "forbidden") return jsonError("Your workspace role does not allow project updates.", 403);
     if (result.kind === "invalid_transition") {
       return NextResponse.json(
         { error: `Invalid project transition: ${result.currentStatus} -> ${nextStatus}`, current_status: result.currentStatus },
