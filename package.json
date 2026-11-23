@@ -3,7 +3,32 @@
   "version": "0.1.0",
   "private": true,
   "description": "Autonomous product creation and lifecycle platform",
-  "scripts": { "dev": "next dev", "build": "next build", "start": "next start", "lint": "eslint .", "typecheck": "tsc --noEmit" },
-  "dependencies": { "lucide-react": "^0.468.0", "next": "^15.5.6", "react": "^19.0.0", "react-dom": "^19.0.0" },
-  "devDependencies": { "@types/node": "^22.13.4", "@types/react": "^19.0.8", "@types/react-dom": "^19.0.3", "autoprefixer": "^10.4.20", "eslint": "^9.20.1", "eslint-config-next": "^15.5.6", "postcss": "^8.5.3", "tailwindcss": "^3.4.17", "typescript": "^5.7.3" }
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test:postgres-runtime": "tsx scripts/test-postgres-runtime.ts"
+  },
+  "dependencies": {
+    "lucide-react": "^0.468.0",
+    "next": "^15.5.6",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "pg": "^8.16.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.4",
+    "@types/react": "^19.0.8",
+    "@types/react-dom": "^19.0.3",
+    "autoprefixer": "^10.4.20",
+    "eslint": "^9.20.1",
+    "eslint-config-next": "^15.5.6",
+    "postcss": "^8.5.3",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.7.3",
+    "@types/pg": "^8.15.5",
+    "tsx": "^4.20.5"
+  }
 }
