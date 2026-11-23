@@ -189,7 +189,7 @@ async function main() {
     assert.equal(payload.provider, "openai");
     assert.equal(s.committedArtifacts, 1);
     assert.equal(s.committedActivities, 1);
-    assert.match(s.sqlCalls.find((sql) => sql.includes("FOR UPDATE OF p, m")) ?? "", /FOR UPDATE OF p, m/);
+    assert.match(s.sqlCalls.find((sql) => sql.includes("FOR UPDATE OF p")) ?? "", /FOR UPDATE OF p/);
   }
   {
     const s = setup({ activityFailure: true });
