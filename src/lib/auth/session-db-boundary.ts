@@ -4,9 +4,9 @@ type SessionLike = {
   user?: { id?: unknown } | null;
 } | null | undefined;
 
-type TransactionRunner<T> = (
+type TransactionRunner<T, Work> = (
   verifiedUserId: string,
-  work: () => Promise<T>,
+  work: Work,
 ) => Promise<T>;
 
 /**
@@ -14,10 +14,10 @@ type TransactionRunner<T> = (
  * This function intentionally has no request, body, query, or client identity
  * parameter. The caller must supply Auth.js auth() as getSession.
  */
-export async function withVerifiedSessionTransaction<T>(
+export async function withVerifiedSessionTransaction<T, Work>(
   getSession: () => Promise<SessionLike>,
-  runTransaction: TransactionRunner<T>,
-  work: () => Promise<T>,
+  runTransaction: TransactionRunner<T, Work>,
+  work: Work,
 ): Promise<T> {
   const session = await getSession();
   const verifiedUserId = requireVerifiedSessionIdentity(session?.user?.id);
