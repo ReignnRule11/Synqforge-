@@ -57,3 +57,5 @@
  .workspace-card-meta{font-size:8px}
  .notice{font-size:9px}
 }
+
+.nav-link:disabled{opacity:.38;cursor:not-allowed}.nav-link:disabled:hover{background:transparent;color:#9299ab}
