@@ -1,13 +1,9 @@
 import { createHash } from "node:crypto";
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { Pool, type PoolClient } from "pg";
 
-const MIGRATION_DIRECTORY = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  "../database/migrations",
-);
+const MIGRATION_DIRECTORY = path.resolve(process.cwd(), "database/migrations");
 const MIGRATION_NAME = /^\d{4}_[a-z0-9_]+\.sql$/;
 const LOCK_KEY = 1_389_845_761;
 
@@ -84,6 +80,14 @@ async function applyMigrations(): Promise<void> {
       "SELECT version, checksum FROM public.schema_migrations ORDER BY version",
     );
     const appliedByName = new Map(applied.rows.map((row) => [row.version, row.checksum]));
+    const unknownApplied = [...appliedByName.keys()].filter(
+      (version) => !migrations.some((migration) => migration.name === version),
+    );
+    if (unknownApplied.length > 0) {
+      throw new Error(
+        `Database contains migrations absent from this checkout: ${unknownApplied.join(", ")}`,
+      );
+    }
 
     for (const migration of migrations) {
       const previousChecksum = appliedByName.get(migration.name);
@@ -112,14 +116,6 @@ async function applyMigrations(): Promise<void> {
       }
     }
 
-    const unknownApplied = [...appliedByName.keys()].filter(
-      (version) => !migrations.some((migration) => migration.name === version),
-    );
-    if (unknownApplied.length > 0) {
-      throw new Error(
-        `Database contains migrations absent from this checkout: ${unknownApplied.join(", ")}`,
-      );
-    }
     console.log("Migration run completed.");
   } finally {
     await client.query("SELECT pg_advisory_unlock($1)", [LOCK_KEY]).catch(() => undefined);
