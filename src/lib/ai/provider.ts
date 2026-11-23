@@ -27,7 +27,7 @@ function readConfig(env: NodeJS.ProcessEnv = process.env): ProviderConfig {
   let endpoint: URL;
   try {
     endpoint = new URL(baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`);
-    endpoint.pathname = `${endpoint.pathname.replace(/\\/+$/, "")}/chat/completions`;
+    endpoint.pathname = `${endpoint.pathname.endsWith("/") ? endpoint.pathname.slice(0, -1) : endpoint.pathname}/chat/completions`;
   } catch {
     throw new Error("AI_BASE_URL must be a valid absolute URL.");
   }
