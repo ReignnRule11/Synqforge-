@@ -1,6 +1,7 @@
 import NextAuth from "next-auth";
 import GitHub from "next-auth/providers/github";
 import { githubUserIdToUuid } from "./src/lib/auth/identity";
+import { requireVerifiedSessionIdentity } from "./src/lib/auth/session-identity";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   trustHost: true,
@@ -15,9 +16,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       return token;
     },
     async session({ session, token }) {
-      if (session.user && token.sub) {
-        session.user.id = token.sub;
+      if (!session.user) {
+        throw new Error("Verified session user is missing.");
       }
+      session.user.id = requireVerifiedSessionIdentity(token.sub);
       return session;
     },
   },
