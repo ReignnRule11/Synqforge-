@@ -157,7 +157,7 @@ async function main() {
   }
   {
     const s = setup({ providerUnconfigured: true });
-    assert.equal((await s.handlers.POST(consent(), context)).status, 502);
+    assert.equal((await s.handlers.POST(consent(), context)).status, 503);
     assert.equal(s.providerCalls, 0);
   }
   {
