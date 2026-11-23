@@ -1,5 +1,7 @@
 # SynqForge
 
+[![SynqForge CI](https://github.com/ReignnRule11/Synqforge-/actions/workflows/ci.yml/badge.svg)](https://github.com/ReignnRule11/Synqforge-/actions/workflows/ci.yml)
+
 **From idea to industry.** SynqForge is an autonomous product creation and lifecycle platform designed to help founders turn ideas into validated product plans, architecture, real applications, tests, and deployments from one workspace.
 
 ## Product direction
