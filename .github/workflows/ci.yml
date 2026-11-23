@@ -16,6 +16,7 @@ jobs:
           node-version: 20
       - run: npm install
       - run: npm run test:auth-identity
+      - run: npm run test:auth-session-identity
       - run: npm run typecheck
       - run: npm run lint
       - run: npm run build
