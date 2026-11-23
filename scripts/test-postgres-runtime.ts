@@ -169,6 +169,18 @@ async function run() {
   assert.ok(ownerProjects.includes(memberProject), "owner can list member-created projects");
 
   await assert.rejects(
+    withAuthenticatedUserTransaction(runtime, userA, async (client) =>
+      client.query(
+        `INSERT INTO projects (workspace_id, name, target, created_by)
+         VALUES ($1, 'Forged creator', 'web', $2)`,
+        [workspaceA, userB],
+      ),
+    ),
+    { code: "42501" },
+    "creator identity must not be forgeable even inside an otherwise authorized workspace",
+  );
+
+  await assert.rejects(
     withAuthenticatedUserTransaction(runtime, viewerUser, async (client) =>
       client.query(
         `INSERT INTO projects (workspace_id, name, target, created_by)
