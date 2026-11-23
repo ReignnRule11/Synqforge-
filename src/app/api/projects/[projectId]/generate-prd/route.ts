@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { withCurrentUserTransaction } from "@/lib/auth/authenticated-db";
 import { generatePrd } from "@/lib/ai/gateway";
 import { createProviderConfig } from "@/lib/ai/provider";
+import { validateProjectArtifactInput } from "@/lib/projects/artifacts";
 
 export const runtime = "nodejs";
 
@@ -22,10 +23,6 @@ function statusFor(error: unknown): number {
   return 500;
 }
 
-/**
- * Generate a first-draft PRD. The caller must explicitly consent to sending
- * this project's brief to the currently configured external AI provider.
- */
 /** Return the selected provider so the UI can disclose the recipient before consent. */
 export async function GET(_request: Request, { params }: RouteContext) {
   const { projectId } = await params;
@@ -54,6 +51,7 @@ export async function GET(_request: Request, { params }: RouteContext) {
   }
 }
 
+/** Generate a first-draft PRD after explicit consent to external processing. */
 export async function POST(request: Request, { params }: RouteContext) {
   const { projectId } = await params;
   if (!UUID_PATTERN.test(projectId)) return errorResponse("A valid project ID is required.", 422);
@@ -105,16 +103,21 @@ export async function POST(request: Request, { params }: RouteContext) {
     if (project.kind === "not_found") return errorResponse("Project not found.", 404);
     if (project.kind === "forbidden") return errorResponse("Your workspace role does not allow PRD generation.", 403);
 
-    let prd;
+    let artifactInput;
     try {
-      prd = await generatePrd({
+      const prd = await generatePrd({
         name: project.project.name,
         description: project.project.description,
         target: project.project.target,
         brief: project.project.brief,
       });
+      artifactInput = validateProjectArtifactInput({
+        artifact_type: "prd",
+        title: prd.title,
+        content: prd,
+      });
     } catch {
-      return errorResponse("The configured AI provider could not produce a valid PRD. No artifact was saved.", 502);
+      return errorResponse("The configured AI provider could not produce a valid PRD within artifact limits. No artifact was saved.", 502);
     }
 
     // Re-authorize after the network call. A role revoked during generation
@@ -149,7 +152,7 @@ export async function POST(request: Request, { params }: RouteContext) {
          VALUES ($1, $2, 'prd', $3, $4, $5::jsonb, current_setting('app.user_id')::uuid)
          RETURNING id, workspace_id, project_id, artifact_type, title, version,
                    content, created_by, created_at`,
-        [current.workspace_id, projectId, prd.title, version, JSON.stringify(prd)],
+        [current.workspace_id, projectId, artifactInput.title, version, JSON.stringify(artifactInput.content)],
       );
       await client.query(
         `INSERT INTO project_activity (workspace_id, project_id, actor_id, event_type, summary, metadata)
