@@ -39,7 +39,24 @@ jobs:
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/synqforge_test
         run: bash scripts/test-postgres-permissions.sh
-      - name: Test server transaction identity and pooled isolation
+      - name: Provision dedicated least-privilege runtime login
         env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/synqforge_test
+          ADMIN_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/synqforge_test
+        run: |
+          psql "$ADMIN_DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          DO $$
+          BEGIN
+            IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'synqforge_test_runtime') THEN
+              CREATE ROLE synqforge_test_runtime LOGIN PASSWORD 'ci-runtime-password' NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
+            ELSE
+              ALTER ROLE synqforge_test_runtime LOGIN PASSWORD 'ci-runtime-password' NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
+            END IF;
+          END
+          $$;
+          GRANT synqforge_app TO synqforge_test_runtime;
+          SQL
+      - name: Test server transaction identity and least-privilege pooled isolation
+        env:
+          ADMIN_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/synqforge_test
+          DATABASE_URL: postgresql://synqforge_test_runtime:ci-runtime-password@localhost:5432/synqforge_test
         run: npm run test:postgres-runtime
