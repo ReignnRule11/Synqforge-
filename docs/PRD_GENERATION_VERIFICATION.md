@@ -31,4 +31,4 @@ For each run, record the application commit SHA, environment, provider/model ide
 
 ## Current verification boundary
 
-The current CI suite validates deterministic provider adapters and PRD schema/artifact validation. Dedicated automated route-level tests and live end-to-end OAuth/provider smoke tests remain outstanding. It does not prove that GitHub OAuth is configured correctly in a deployed environment, that a live provider accepts the selected model, or that the hosting environment has the required secrets and network access. Those checks require an explicitly authorized manual smoke test using synthetic data.
+Dedicated automated route-level tests now run in CI alongside deterministic provider-adapter and PRD schema/artifact validation. Live end-to-end OAuth/provider smoke tests remain outstanding. It does not prove that GitHub OAuth is configured correctly in a deployed environment, that a live provider accepts the selected model, or that the hosting environment has the required secrets and network access. Those checks require an explicitly authorized manual smoke test using synthetic data.
