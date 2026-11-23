@@ -147,6 +147,11 @@ async function run() {
   assert.equal(ownerProject.workspace_id, workspaceA);
   assert.equal(ownerProject.created_by, userA, "creator identity must come from transaction context");
 
+  const ownerTransition = await withAuthenticatedUserTransaction(runtime, userA, async (client) => {
+    const result = await client.query("UPDATE projects SET status = 'discovery', updated_at = now() WHERE id = $1 RETURNING status", [ownerProject.id]);
+    return result.rows[0]?.status;
+  });
+  assert.equal(ownerTransition, "discovery", "owner can update a project lifecycle status");
   const memberProject = await withAuthenticatedUserTransaction(runtime, memberUser, async (client) => {
     const result = await client.query(
       `INSERT INTO projects (workspace_id, name, target, created_by)
@@ -168,6 +173,43 @@ async function run() {
   assert.ok(ownerProjects.includes(ownerProject.id), "owner can list projects in own workspace");
   assert.ok(ownerProjects.includes(memberProject), "owner can list member-created projects");
 
+  const memberTransition = await withAuthenticatedUserTransaction(runtime, memberUser, async (client) => {
+    const result = await client.query("UPDATE projects SET status = 'planning', updated_at = now() WHERE id = $1 RETURNING status", [ownerProject.id]);
+    return result.rows[0]?.status;
+  });
+  assert.equal(memberTransition, "planning", "member editor can update a project lifecycle status");
+
+  await assert.rejects(
+    withAuthenticatedUserTransaction(runtime, viewerUser, async (client) =>
+      client.query("UPDATE projects SET status = 'design' WHERE id = $1", [ownerProject.id]),
+    ),
+    { code: "42501" },
+    "viewer must not update project lifecycle status",
+  );
+
+  const crossTenantUpdate = await withAuthenticatedUserTransaction(runtime, userB, async (client) =>
+    client.query("UPDATE projects SET status = 'archived' WHERE id = $1 RETURNING id", [ownerProject.id]),
+  );
+  assert.equal(crossTenantUpdate.rows.length, 0, "cross-tenant lifecycle update must not reveal or modify a project");
+
+  await withAuthenticatedUserTransaction(runtime, userA, async (client) =>
+    client.query(
+      `INSERT INTO project_activity (workspace_id, project_id, actor_id, event_type, summary, metadata)
+       VALUES ($1, $2, current_setting('app.user_id')::uuid, 'project.status_changed', 'Project moved to planning.', '{"from":"discovery","to":"planning"}'::jsonb)`,
+      [workspaceA, ownerProject.id],
+    ),
+  );
+  await assert.rejects(
+    withAuthenticatedUserTransaction(runtime, viewerUser, async (client) =>
+      client.query(
+        `INSERT INTO project_activity (workspace_id, project_id, actor_id, event_type, summary)
+         VALUES ($1, $2, current_setting('app.user_id')::uuid, 'project.status_changed', 'forbidden')`,
+        [workspaceA, ownerProject.id],
+      ),
+    ),
+    { code: "42501" },
+    "viewer must not append project lifecycle activity",
+  );
   await assert.rejects(
     withAuthenticatedUserTransaction(runtime, userA, async (client) =>
       client.query(
@@ -210,7 +252,7 @@ async function run() {
   });
   assert.equal(tenantBProjects.length, 0, "cross-tenant project listing must return no rows");
 
-  console.log("PASS: least-privilege runtime, tenant isolation, workspace bootstrap, project CRUD authorization, and denial checks.");
+  console.log("PASS: least-privilege runtime, tenant isolation, workspace bootstrap, project creation, lifecycle update, activity append authorization, and denial checks.");
 }
 run()
   .catch(async (error) => {
