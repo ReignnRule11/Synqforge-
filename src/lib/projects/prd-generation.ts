@@ -135,7 +135,7 @@ export function createPrdGenerationHandlers(deps: PrdGenerationDependencies) {
              ON m.workspace_id = p.workspace_id
             AND m.user_id = current_setting('app.user_id')::uuid
            WHERE p.id = $1
-           FOR UPDATE OF p, m`,
+           FOR UPDATE OF p`,
           [projectId],
         );
         const current = access.rows[0] as { workspace_id: string; role: string } | undefined;
