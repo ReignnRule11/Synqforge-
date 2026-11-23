@@ -25,7 +25,7 @@
 
 ## Current status
 
-The repository contains a responsive Next.js foundation and an initial Project Engine domain/schema. The Project Engine migration is not yet applied to a live database. Authentication, runtime persistence, project API routes, AI, build sandbox, GitHub automation, and deployment orchestration are not connected until implemented and verified.
+The repository contains a responsive Next.js foundation and an initial Project Engine domain/schema. The Project Engine migration is not yet applied to a live database. The transaction-scoped PostgreSQL adapter is implemented and covered by CI tests for pooled identity isolation. Authentication/session verification and a separate least-privilege runtime login are still not connected. Project API routes, AI, build sandbox, GitHub automation, and deployment orchestration remain unimplemented.
 
 ## Local development
 
