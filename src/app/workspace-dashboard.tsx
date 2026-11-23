@@ -27,6 +27,8 @@ type Project = {
   updated_at: string;
 };
 
+type Artifact = { id: string; artifact_type: string; title: string; version: number; content: Record<string, unknown>; created_at: string };
+
 type Props = {
   initialWorkspaces: Workspace[];
   userName: string;
@@ -66,6 +68,13 @@ export default function WorkspaceDashboard({ initialWorkspaces, userName, userEm
   const [nextProjectStatus, setNextProjectStatus] = useState("");
   const [statusSaving, setStatusSaving] = useState(false);
   const [detailError, setDetailError] = useState("");
+  const [artifacts, setArtifacts] = useState<Artifact[]>([]);
+  const [artifactsLoading, setArtifactsLoading] = useState(false);
+  const [artifactType, setArtifactType] = useState("prd");
+  const [artifactTitle, setArtifactTitle] = useState("");
+  const [artifactContent, setArtifactContent] = useState('{"summary":"","problem":"","audience":"","solution":""}');
+  const [artifactSaving, setArtifactSaving] = useState(false);
+
 
 
   const activeWorkspace = workspaces.find((workspace) => workspace.id === activeWorkspaceId) ?? null;
@@ -83,6 +92,53 @@ export default function WorkspaceDashboard({ initialWorkspaces, userName, userEm
       .finally(() => { if (!cancelled) setProjectsLoading(false); });
     return () => { cancelled = true; };
   }, [activeWorkspaceId]);
+
+  useEffect(() => {
+    if (!selectedProject) { setArtifacts([]); return; }
+    let cancelled = false;
+    setArtifactsLoading(true);
+    fetch(`/api/projects/${encodeURIComponent(selectedProject.id)}/artifacts`)
+      .then(async (response) => {
+        const payload = await response.json().catch(() => ({})) as { artifacts?: Artifact[]; error?: string };
+        if (!response.ok) throw new Error(payload.error || "Artifacts could not be loaded.");
+        if (!cancelled) setArtifacts(Array.isArray(payload.artifacts) ? payload.artifacts : []);
+      })
+      .catch((cause) => { if (!cancelled) setDetailError(cause instanceof Error ? cause.message : "Artifacts could not be loaded."); })
+      .finally(() => { if (!cancelled) setArtifactsLoading(false); });
+    return () => { cancelled = true; };
+  }, [selectedProject?.id]);
+
+  async function createArtifact(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!selectedProject || artifactSaving || activeWorkspace?.role === "viewer") return;
+    let content: Record<string, unknown>;
+    try {
+      const parsed: unknown = JSON.parse(artifactContent);
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("Content must be a JSON object.");
+      content = parsed as Record<string, unknown>;
+    } catch (cause) {
+      setDetailError(cause instanceof Error ? cause.message : "Artifact content must be valid JSON.");
+      return;
+    }
+    setArtifactSaving(true);
+    setDetailError("");
+    try {
+      const response = await fetch(`/api/projects/${encodeURIComponent(selectedProject.id)}/artifacts`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ artifact_type: artifactType, title: artifactTitle, content }),
+      });
+      const payload = await response.json().catch(() => ({})) as { artifact?: Artifact; error?: string };
+      if (!response.ok || !payload.artifact) throw new Error(payload.error || "Artifact could not be saved.");
+      setArtifacts((current) => [payload.artifact!, ...current]);
+      setArtifactTitle("");
+      setNotice(`Saved ${payload.artifact.artifact_type} version ${payload.artifact.version}.`);
+    } catch (cause) {
+      setDetailError(cause instanceof Error ? cause.message : "Artifact could not be saved.");
+    } finally {
+      setArtifactSaving(false);
+    }
+  }
 
   const filteredWorkspaces = useMemo(
     () => workspaces.filter((workspace) => workspace.name.toLowerCase().includes(search.toLowerCase())),
@@ -357,7 +413,31 @@ export default function WorkspaceDashboard({ initialWorkspaces, userName, userEm
             {activeWorkspace?.role === "viewer" ? <small className="modal-disclaimer">Viewer access is read-only. You can inspect this project but cannot change its lifecycle status.</small> : (
               <button className="primary modal-submit" type="button" disabled={statusSaving || nextProjectStatus === selectedProject.status} onClick={() => void saveProjectStatus()}>{statusSaving ? "Saving status…" : "Save lifecycle status"} <ArrowUpRight size={16} /></button>
             )}
-            <small className="modal-disclaimer">Transitions are validated by the server. PostgreSQL row-level security enforces workspace editor permissions.</small>
+            <div className="artifact-section">
+              <div className="panel-head"><div><h3>Project documents</h3><p>Immutable, versioned artifacts attached to this project.</p></div><span className="tag">{artifacts.length} VERSIONS</span></div>
+              {artifactsLoading ? <p>Loading document history…</p> : artifacts.length ? (
+                <div className="artifact-list">{artifacts.map((artifact) => (
+                  <details className="artifact-item" key={artifact.id}>
+                    <summary><span><b>{artifact.title}</b><small>{artifact.artifact_type.replaceAll("_", " ")} · v{artifact.version}</small></span><small>{new Date(artifact.created_at).toLocaleDateString()}</small></summary>
+                    <pre>{JSON.stringify(artifact.content, null, 2)}</pre>
+                  </details>
+                ))}</div>
+              ) : <p className="modal-disclaimer">No documents have been saved for this project.</p>}
+              {activeWorkspace?.role !== "viewer" && (
+                <form className="artifact-form" onSubmit={createArtifact}>
+                  <label htmlFor="artifact-type">Document type</label>
+                  <select id="artifact-type" className="modal-input" value={artifactType} onChange={(event) => setArtifactType(event.target.value)}>
+                    <option value="product_brief">Product brief</option><option value="prd">PRD</option><option value="user_stories">User stories</option><option value="roadmap">Roadmap</option><option value="design_spec">Design specification</option><option value="architecture">Architecture</option><option value="api_contract">API contract</option><option value="database_schema">Database schema</option><option value="source_code">Source code</option><option value="test_report">Test report</option>
+                  </select>
+                  <label htmlFor="artifact-title">Document title</label>
+                  <input id="artifact-title" className="modal-input" minLength={2} maxLength={160} required value={artifactTitle} onChange={(event) => setArtifactTitle(event.target.value)} placeholder="e.g. Product requirements v1" />
+                  <label htmlFor="artifact-content">Structured content (JSON)</label>
+                  <textarea id="artifact-content" className="modal-input artifact-json" rows={5} value={artifactContent} onChange={(event) => setArtifactContent(event.target.value)} required />
+                  <button className="primary modal-submit" type="submit" disabled={artifactSaving || !artifactTitle.trim()}>{artifactSaving ? "Saving document…" : "Save new version"} <ArrowUpRight size={16} /></button>
+                </form>
+              )}
+            </div>
+            <small className="modal-disclaimer">Documents are append-only. Each save creates a new version; workspace roles and PostgreSQL RLS control access.</small>
           </section>
         </div>
       )}
