@@ -15,10 +15,20 @@
 - [x] PostgreSQL permission and bootstrap CI tests
 - [x] Transaction-scoped runtime adapter and pooled identity isolation tests
 - [x] Dedicated non-owner runtime login and least-privilege integration tests
-- [ ] Authentication/session provider and secure workspace onboarding
+- [x] Authentication/session provider and secure workspace onboarding
 - [ ] Migration runner and operational database configuration
-- [ ] Authenticated workspace/project API handlers with role-aware authorization
-- [ ] Persistent project UI and integration tests
+- [x] Authenticated workspace and project list/create API handlers with role-aware authorization
+- [x] Persistent project listing and creation UI scoped to the selected workspace
+- [x] Project input validation and PostgreSQL role/tenant isolation tests
+- [x] Persistent project UI and API integration surface for project detail and lifecycle updates
+- [x] Lifecycle transition domain validation and role-aware PostgreSQL update/activity tests
+- [x] Versioned project artifact API with immutable append-only document versions
+- [x] Project document history and editor UI for briefs, PRDs, stories, roadmaps, architecture, and other artifact types
+- [x] Artifact validation, version allocation, and role/tenant isolation PostgreSQL tests
+- [x] Versioned project artifact API with immutable append-only document versions
+- [x] Project document history and editor UI for briefs, PRDs, stories, roadmaps, architecture, and other artifact types
+- [x] Artifact validation and PostgreSQL role/tenant isolation tests
+- [ ] Browser-level end-to-end tests against a live Auth.js and PostgreSQL environment
 
 ## Phase 2 — Product Intelligence
 - Provider-agnostic AI gateway with strict typed outputs

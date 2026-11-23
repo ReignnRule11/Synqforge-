@@ -12,6 +12,14 @@ export const PROJECT_STATUSES = [
 ] as const;
 
 export type ProjectStatus = (typeof PROJECT_STATUSES)[number];
+
+export function isProjectStatus(value: unknown): value is ProjectStatus {
+  return typeof value === "string" && (PROJECT_STATUSES as readonly string[]).includes(value);
+}
+
+export function allowedProjectTransitions(current: ProjectStatus): ProjectStatus[] {
+  return [...TRANSITIONS[current]];
+}
 export type ProjectTarget = "web" | "mobile" | "web_mobile";
 
 export interface ProjectBrief {

@@ -134,7 +134,167 @@ async function run() {
     "adapter must reject invalid identity input",
   );
 
-  console.log("PASS: least-privilege runtime, tenant isolation, role-scoped workspace listing, bootstrap atomicity, and denial checks.");
+  const ownerProject = await withAuthenticatedUserTransaction(runtime, userA, async (client) => {
+    const result = await client.query(
+      `INSERT INTO projects (workspace_id, name, description, target, created_by)
+       VALUES ($1, 'Owner project', 'Created through the restricted runtime', 'web',
+               current_setting('app.user_id')::uuid)
+       RETURNING id, workspace_id, created_by`,
+      [workspaceA],
+    );
+    return result.rows[0] as { id: string; workspace_id: string; created_by: string };
+  });
+  assert.equal(ownerProject.workspace_id, workspaceA);
+  assert.equal(ownerProject.created_by, userA, "creator identity must come from transaction context");
+
+  const ownerTransition = await withAuthenticatedUserTransaction(runtime, userA, async (client) => {
+    const result = await client.query("UPDATE projects SET status = 'discovery', updated_at = now() WHERE id = $1 RETURNING status", [ownerProject.id]);
+    return result.rows[0]?.status;
+  });
+  assert.equal(ownerTransition, "discovery", "owner can update a project lifecycle status");
+
+  const firstArtifact = await withAuthenticatedUserTransaction(runtime, userA, async (client) => {
+    const result = await client.query(
+      `INSERT INTO project_artifacts (workspace_id, project_id, artifact_type, title, version, content, created_by)
+       VALUES ($1, $2, 'prd', 'Product requirements', 1, '{"summary":"Initial PRD"}'::jsonb, current_setting('app.user_id')::uuid)
+       RETURNING id, version`,
+      [workspaceA, ownerProject.id],
+    );
+    return result.rows[0];
+  });
+  assert.equal(firstArtifact.version, 1, "first artifact version is one");
+
+  const memberArtifact = await withAuthenticatedUserTransaction(runtime, memberUser, async (client) => {
+    const result = await client.query(
+      `INSERT INTO project_artifacts (workspace_id, project_id, artifact_type, title, version, content, created_by)
+       VALUES ($1, $2, 'prd', 'Product requirements update', 2, '{"summary":"Revised PRD"}'::jsonb, current_setting('app.user_id')::uuid)
+       RETURNING id, version`,
+      [workspaceA, ownerProject.id],
+    );
+    return result.rows[0];
+  });
+  assert.equal(memberArtifact.version, 2, "workspace editor can append a subsequent artifact version");
+
+  await assert.rejects(
+    withAuthenticatedUserTransaction(runtime, viewerUser, async (client) =>
+      client.query(
+        `INSERT INTO project_artifacts (workspace_id, project_id, artifact_type, title, version, content, created_by)
+         VALUES ($1, $2, 'prd', 'Viewer forbidden', 3, '{}'::jsonb, current_setting('app.user_id')::uuid)`,
+        [workspaceA, ownerProject.id],
+      ),
+    ),
+    { code: "42501" },
+    "viewer cannot append project artifact versions",
+  );
+
+  const crossTenantArtifacts = await withAuthenticatedUserTransaction(runtime, userB, async (client) =>
+    client.query("SELECT id FROM project_artifacts WHERE project_id = $1", [ownerProject.id]),
+  );
+  assert.equal(crossTenantArtifacts.rows.length, 0, "cross-tenant artifact reads must return no rows");
+
+  const immutableArtifact = await withAuthenticatedUserTransaction(runtime, userA, async (client) =>
+    client.query("UPDATE project_artifacts SET title = 'tampered' WHERE id = $1 RETURNING id", [firstArtifact.id]),
+  );
+  assert.equal(immutableArtifact.rows.length, 0, "artifact versions cannot be edited in place");
+
+  const memberProject = await withAuthenticatedUserTransaction(runtime, memberUser, async (client) => {
+    const result = await client.query(
+      `INSERT INTO projects (workspace_id, name, target, created_by)
+       VALUES ($1, 'Member project', 'mobile', current_setting('app.user_id')::uuid)
+       RETURNING id`,
+      [workspaceA],
+    );
+    return result.rows[0].id as string;
+  });
+  assert.ok(memberProject, "workspace members with editor role can create projects");
+
+  const ownerProjects = await withAuthenticatedUserTransaction(runtime, userA, async (client) => {
+    const result = await client.query(
+      "SELECT id FROM projects WHERE workspace_id = $1 ORDER BY name",
+      [workspaceA],
+    );
+    return result.rows.map((row) => row.id);
+  });
+  assert.ok(ownerProjects.includes(ownerProject.id), "owner can list projects in own workspace");
+  assert.ok(ownerProjects.includes(memberProject), "owner can list member-created projects");
+
+  const memberTransition = await withAuthenticatedUserTransaction(runtime, memberUser, async (client) => {
+    const result = await client.query("UPDATE projects SET status = 'planning', updated_at = now() WHERE id = $1 RETURNING status", [ownerProject.id]);
+    return result.rows[0]?.status;
+  });
+  assert.equal(memberTransition, "planning", "member editor can update a project lifecycle status");
+
+  const viewerUpdate = await withAuthenticatedUserTransaction(runtime, viewerUser, async (client) =>
+    client.query("UPDATE projects SET status = 'design' WHERE id = $1 RETURNING id", [ownerProject.id]),
+  );
+  assert.equal(viewerUpdate.rows.length, 0, "viewer RLS policy must silently filter project lifecycle updates");
+
+  const crossTenantUpdate = await withAuthenticatedUserTransaction(runtime, userB, async (client) =>
+    client.query("UPDATE projects SET status = 'archived' WHERE id = $1 RETURNING id", [ownerProject.id]),
+  );
+  assert.equal(crossTenantUpdate.rows.length, 0, "cross-tenant lifecycle update must not reveal or modify a project");
+
+  await withAuthenticatedUserTransaction(runtime, userA, async (client) =>
+    client.query(
+      `INSERT INTO project_activity (workspace_id, project_id, actor_id, event_type, summary, metadata)
+       VALUES ($1, $2, current_setting('app.user_id')::uuid, 'project.status_changed', 'Project moved to planning.', '{"from":"discovery","to":"planning"}'::jsonb)`,
+      [workspaceA, ownerProject.id],
+    ),
+  );
+  await assert.rejects(
+    withAuthenticatedUserTransaction(runtime, viewerUser, async (client) =>
+      client.query(
+        `INSERT INTO project_activity (workspace_id, project_id, actor_id, event_type, summary)
+         VALUES ($1, $2, current_setting('app.user_id')::uuid, 'project.status_changed', 'forbidden')`,
+        [workspaceA, ownerProject.id],
+      ),
+    ),
+    { code: "42501" },
+    "viewer must not append project lifecycle activity",
+  );
+  await assert.rejects(
+    withAuthenticatedUserTransaction(runtime, userA, async (client) =>
+      client.query(
+        `INSERT INTO projects (workspace_id, name, target, created_by)
+         VALUES ($1, 'Forged creator', 'web', $2)`,
+        [workspaceA, userB],
+      ),
+    ),
+    { code: "42501" },
+    "creator identity must not be forgeable even inside an otherwise authorized workspace",
+  );
+
+  await assert.rejects(
+    withAuthenticatedUserTransaction(runtime, viewerUser, async (client) =>
+      client.query(
+        `INSERT INTO projects (workspace_id, name, target, created_by)
+         VALUES ($1, 'Viewer forbidden', 'web', current_setting('app.user_id')::uuid)`,
+        [workspaceA],
+      ),
+    ),
+    { code: "42501" },
+    "viewer must not create projects",
+  );
+
+  await assert.rejects(
+    withAuthenticatedUserTransaction(runtime, userB, async (client) =>
+      client.query(
+        `INSERT INTO projects (workspace_id, name, target, created_by)
+         VALUES ($1, 'Cross-tenant attack', 'web', current_setting('app.user_id')::uuid)`,
+        [workspaceA],
+      ),
+    ),
+    { code: "42501" },
+    "a valid workspace UUID must not bypass tenant membership checks",
+  );
+
+  const tenantBProjects = await withAuthenticatedUserTransaction(runtime, userB, async (client) => {
+    const result = await client.query("SELECT id FROM projects WHERE workspace_id = $1", [workspaceA]);
+    return result.rows;
+  });
+  assert.equal(tenantBProjects.length, 0, "cross-tenant project listing must return no rows");
+
+  console.log("PASS: least-privilege runtime, tenant isolation, workspace bootstrap, project creation, lifecycle update, activity append authorization, and denial checks.");
 }
 run()
   .catch(async (error) => {
