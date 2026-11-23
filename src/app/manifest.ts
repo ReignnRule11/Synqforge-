@@ -1,0 +1,2 @@
+import type { MetadataRoute } from "next";
+export default function manifest(): MetadataRoute.Manifest { return { name: "SynqForge", short_name: "SynqForge", description: "From idea to industry", start_url: "/", display: "standalone", background_color: "#090b12", theme_color: "#090b12", icons: [] }; }
