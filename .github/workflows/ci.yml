@@ -22,6 +22,7 @@ jobs:
       - run: npm run test:project-domain
       - run: npm run test:project-artifacts
       - run: npm run test:ai-gateway
+      - run: npm run test:prd-generation-route
       - run: npm run typecheck
       - run: npm run lint
       - run: npm run build
