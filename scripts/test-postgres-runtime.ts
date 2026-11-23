@@ -107,7 +107,7 @@ async function run() {
   // Force the owner-membership insert to fail and verify the workspace insert rolls back.
   await admin.query(
     `CREATE OR REPLACE FUNCTION public.reject_workspace_membership_test()
-     RETURNS trigger LANGUAGE plpgsql AS $$
+     RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $
      BEGIN
        IF NEW.workspace_id IN (SELECT id FROM public.workspaces WHERE slug = 'bootstrap-rollback') THEN
          RAISE EXCEPTION 'forced membership failure' USING ERRCODE = '23514';
