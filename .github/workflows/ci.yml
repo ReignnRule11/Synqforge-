@@ -18,6 +18,7 @@ jobs:
       - run: npm run test:auth-identity
       - run: npm run test:auth-session-identity
       - run: npm run test:authenticated-db-boundary
+      - run: npm run test:workspace-domain
       - run: npm run typecheck
       - run: npm run lint
       - run: npm run build
