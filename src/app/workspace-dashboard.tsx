@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { signOut } from "next-auth/react";
 import {
   Activity, ArrowUpRight, Atom, Blocks, Check, ChevronDown, CircleHelp,
@@ -14,6 +14,17 @@ type Workspace = {
   slug: string;
   role: "owner" | "admin" | "member" | "viewer";
   created_at: string;
+};
+
+type Project = {
+  id: string;
+  workspace_id: string;
+  name: string;
+  description: string;
+  target: "web" | "mobile" | "web_mobile";
+  status: string;
+  created_at: string;
+  updated_at: string;
 };
 
 type Props = {
@@ -43,8 +54,31 @@ export default function WorkspaceDashboard({ initialWorkspaces, userName, userEm
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [projectsLoading, setProjectsLoading] = useState(false);
+  const [projectOpen, setProjectOpen] = useState(false);
+  const [projectName, setProjectName] = useState("");
+  const [projectDescription, setProjectDescription] = useState("");
+  const [projectTarget, setProjectTarget] = useState<Project["target"]>("web");
+  const [projectCreating, setProjectCreating] = useState(false);
+  const [projectError, setProjectError] = useState("");
 
   const activeWorkspace = workspaces.find((workspace) => workspace.id === activeWorkspaceId) ?? null;
+  useEffect(() => {
+    if (!activeWorkspaceId) { setProjects([]); return; }
+    let cancelled = false;
+    setProjectsLoading(true);
+    fetch(`/api/projects?workspace_id=${encodeURIComponent(activeWorkspaceId)}`)
+      .then(async (response) => {
+        const payload = await response.json().catch(() => ({})) as { projects?: Project[]; error?: string };
+        if (!response.ok) throw new Error(payload.error || "Projects could not be loaded.");
+        if (!cancelled) setProjects(Array.isArray(payload.projects) ? payload.projects : []);
+      })
+      .catch((cause) => { if (!cancelled) { setProjects([]); setProjectError(cause instanceof Error ? cause.message : "Projects could not be loaded."); } })
+      .finally(() => { if (!cancelled) setProjectsLoading(false); });
+    return () => { cancelled = true; };
+  }, [activeWorkspaceId]);
+
   const filteredWorkspaces = useMemo(
     () => workspaces.filter((workspace) => workspace.name.toLowerCase().includes(search.toLowerCase())),
     [workspaces, search],
@@ -80,6 +114,27 @@ export default function WorkspaceDashboard({ initialWorkspaces, userName, userEm
     } finally {
       setCreating(false);
     }
+  }
+
+  async function createProject(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!activeWorkspaceId || projectCreating) return;
+    setProjectCreating(true);
+    setProjectError("");
+    try {
+      const response = await fetch("/api/projects", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ workspace_id: activeWorkspaceId, name: projectName, description: projectDescription, target: projectTarget }),
+      });
+      const payload = await response.json().catch(() => ({})) as { project?: Project; error?: string };
+      if (!response.ok || !payload.project) throw new Error(payload.error || "Project could not be created.");
+      setProjects((current) => [payload.project!, ...current.filter((item) => item.id !== payload.project!.id)]);
+      setProjectName(""); setProjectDescription(""); setProjectTarget("web"); setProjectOpen(false);
+      setNotice("Project created and saved to this workspace.");
+    } catch (cause) {
+      setProjectError(cause instanceof Error ? cause.message : "Project could not be created.");
+    } finally { setProjectCreating(false); }
   }
 
   return (
@@ -120,7 +175,7 @@ export default function WorkspaceDashboard({ initialWorkspaces, userName, userEm
           <section className="nav-group" key={group.label}>
             <div className="group-label">{group.label}</div>
             {group.items.map(([label, Icon]) => (
-              <button key={label} type="button" disabled={label !== "Overview"} title={label !== "Overview" ? "Available in a later milestone" : undefined} onClick={() => setActiveNav(label)} className={"nav-link " + (activeNav === label ? "active" : "")}>
+              <button key={label} type="button" disabled={label !== "Overview" && label !== "Projects"} title={label !== "Overview" && label !== "Projects" ? "Available in a later milestone" : undefined} onClick={() => setActiveNav(label)} className={"nav-link " + (activeNav === label ? "active" : "")}>
                 <Icon size={17} /><span>{label}</span>
               </button>
             ))}
@@ -158,7 +213,7 @@ export default function WorkspaceDashboard({ initialWorkspaces, userName, userEm
             <div>
               <div className="eyebrow"><span className="live-dot" /> AUTHENTICATED PRODUCT WORKSPACE</div>
               <h1>Build with <span>clarity and control.</span></h1>
-              <p>Your workspace foundation is connected. Create and switch between persistent team spaces.</p>
+              <p>Create products inside a persistent workspace. Project access is enforced by your authenticated membership.</p>
             </div>
             <button className="primary" type="button" onClick={() => { setCreateOpen(true); setError(""); }}><Plus size={17} /> Create workspace</button>
           </div>
@@ -168,9 +223,27 @@ export default function WorkspaceDashboard({ initialWorkspaces, userName, userEm
           <div className="stats">
             <div className="stat-card"><div className="stat-label">Your workspaces <Layers3 size={16} /></div><strong>{String(workspaces.length).padStart(2, "0")}</strong><span className="stat-foot">Persistent PostgreSQL records</span></div>
             <div className="stat-card"><div className="stat-label">Current role <ShieldCheck size={16} /></div><strong className="ready">{activeWorkspace?.role ?? "—"}</strong><span className="stat-foot">Enforced by database policies</span></div>
-            <div className="stat-card"><div className="stat-label">Project engine <FolderKanban size={16} /></div><strong>Next</strong><span className="stat-foot">Project persistence not connected</span></div>
+            <div className="stat-card"><div className="stat-label">Project engine <FolderKanban size={16} /></div><strong className="ready">{projects.length}</strong><span className="stat-foot">Projects in selected workspace</span></div>
             <div className="stat-card"><div className="stat-label">Authentication <Activity size={16} /></div><strong className="ready">Verified</strong><span className="stat-foot">GitHub OAuth session</span></div>
           </div>
+
+          <section className="panel" style={{ marginBottom: 24 }}>
+            <div className="panel-head">
+              <div><h2>Projects {activeWorkspace ? `· ${activeWorkspace.name}` : ""}</h2><p>Projects are isolated by workspace and database role.</p></div>
+              <button className="primary" type="button" disabled={!activeWorkspace || activeWorkspace.role === "viewer"} onClick={() => { setProjectError(""); setProjectOpen(true); }}><Plus size={15} /> New project</button>
+            </div>
+            {projectError && !projectOpen && <p className="form-error" role="alert">{projectError}</p>}
+            {projectsLoading ? <p>Loading workspace projects…</p> : projects.length ? (
+              <div className="workspace-grid">
+                {projects.map((project) => <article className="workspace-card" key={project.id}>
+                  <div className="project-top"><div className="project-icon"><FolderKanban size={19} /></div><span className="role-chip">{project.status}</span></div>
+                  <h3>{project.name}</h3><p className="project-desc">{project.description || "No project description yet."}</p>
+                  <div className="workspace-card-meta"><span className="role-chip">{project.target.replace("_", " + ")}</span><span>Updated {new Date(project.updated_at).toLocaleDateString()}</span></div>
+                  <div className="project-footer"><span>Workspace project</span><span>Idea stage</span></div>
+                </article>)}
+              </div>
+            ) : <div className="activity-empty"><div className="empty-icon"><FolderKanban size={22} /></div><b>{activeWorkspace ? "No projects in this workspace yet." : "Select or create a workspace first."}</b><p>{activeWorkspace?.role === "viewer" ? "You have read-only access to this workspace." : "Create the first project to begin its product lifecycle."}</p></div>}
+          </section>
 
           <div className="section-heading">
             <div><h2>{activeNav === "Overview" ? "Your workspaces" : activeNav}</h2><p>Only workspaces associated with your authenticated membership are shown.</p></div>
@@ -212,6 +285,21 @@ export default function WorkspaceDashboard({ initialWorkspaces, userName, userEm
           <div className="footer-note"><span><Atom size={14} /> SynqForge workspace foundation</span><span>Authenticated data · PostgreSQL-backed</span></div>
         </div>
       </main>
+
+      {projectOpen && (
+        <div className="overlay" onMouseDown={(event) => { if (event.target === event.currentTarget && !projectCreating) setProjectOpen(false); }}>
+          <form className="modal" onSubmit={createProject}>
+            <div className="modal-head"><div className="modal-icon"><FolderKanban size={20} /></div><button className="close" type="button" aria-label="Close" disabled={projectCreating} onClick={() => setProjectOpen(false)}>×</button></div>
+            <h2>Create a project</h2><p>This project will belong to <b>{activeWorkspace?.name}</b>. Your workspace role controls access.</p>
+            <label htmlFor="project-name">Project name</label><input id="project-name" className="modal-input" maxLength={80} minLength={2} placeholder="e.g. Atlas Learning Platform" value={projectName} onChange={(event) => setProjectName(event.target.value)} required />
+            <label htmlFor="project-description">Description (optional)</label><textarea id="project-description" className="modal-input" maxLength={2000} rows={3} placeholder="What are you building?" value={projectDescription} onChange={(event) => setProjectDescription(event.target.value)} />
+            <label htmlFor="project-target">Target</label><select id="project-target" className="modal-input" value={projectTarget} onChange={(event) => setProjectTarget(event.target.value as Project["target"])}><option value="web">Web</option><option value="mobile">Mobile</option><option value="web_mobile">Web + mobile</option></select>
+            {projectError && <p className="form-error" role="alert">{projectError}</p>}
+            <button className="primary modal-submit" type="submit" disabled={!projectName.trim() || projectCreating}>{projectCreating ? "Creating project…" : <><Plus size={16} /> Create project <ArrowUpRight size={16} /></>}</button>
+            <small className="modal-disclaimer">Creator identity and permissions are enforced server-side and by PostgreSQL RLS.</small>
+          </form>
+        </div>
+      )}
 
       {createOpen && (
         <div className="overlay" onMouseDown={(event) => { if (event.target === event.currentTarget && !creating) setCreateOpen(false); }}>
