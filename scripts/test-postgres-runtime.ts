@@ -152,6 +152,48 @@ async function run() {
     return result.rows[0]?.status;
   });
   assert.equal(ownerTransition, "discovery", "owner can update a project lifecycle status");
+
+  const firstArtifact = await withAuthenticatedUserTransaction(runtime, userA, async (client) => {
+    const result = await client.query(
+      `INSERT INTO project_artifacts (workspace_id, project_id, artifact_type, title, version, content, created_by)
+       VALUES ($1, $2, 'prd', 'Product requirements', 1, '{"summary":"Initial PRD"}'::jsonb, current_setting('app.user_id')::uuid)
+       RETURNING id, version`,
+      [workspaceA, ownerProject.id],
+    );
+    return result.rows[0];
+  });
+  assert.equal(firstArtifact.version, 1, "first artifact version is one");
+
+  const memberArtifact = await withAuthenticatedUserTransaction(runtime, memberUser, async (client) => {
+    const result = await client.query(
+      `INSERT INTO project_artifacts (workspace_id, project_id, artifact_type, title, version, content, created_by)
+       VALUES ($1, $2, 'prd', 'Product requirements update', 2, '{"summary":"Revised PRD"}'::jsonb, current_setting('app.user_id')::uuid)
+       RETURNING id, version`,
+      [workspaceA, ownerProject.id],
+    );
+    return result.rows[0];
+  });
+  assert.equal(memberArtifact.version, 2, "workspace editor can append a subsequent artifact version");
+
+  const viewerArtifactInsert = await withAuthenticatedUserTransaction(runtime, viewerUser, async (client) =>
+    client.query(
+      `INSERT INTO project_artifacts (workspace_id, project_id, artifact_type, title, version, content, created_by)
+       VALUES ($1, $2, 'prd', 'Viewer forbidden', 3, '{}'::jsonb, current_setting('app.user_id')::uuid) RETURNING id`,
+      [workspaceA, ownerProject.id],
+    ),
+  );
+  assert.equal(viewerArtifactInsert.rows.length, 0, "viewer cannot append project artifact versions");
+
+  const crossTenantArtifacts = await withAuthenticatedUserTransaction(runtime, userB, async (client) =>
+    client.query("SELECT id FROM project_artifacts WHERE project_id = $1", [ownerProject.id]),
+  );
+  assert.equal(crossTenantArtifacts.rows.length, 0, "cross-tenant artifact reads must return no rows");
+
+  const immutableArtifact = await withAuthenticatedUserTransaction(runtime, userA, async (client) =>
+    client.query("UPDATE project_artifacts SET title = 'tampered' WHERE id = $1 RETURNING id", [firstArtifact.id]),
+  );
+  assert.equal(immutableArtifact.rows.length, 0, "artifact versions cannot be edited in place");
+
   const memberProject = await withAuthenticatedUserTransaction(runtime, memberUser, async (client) => {
     const result = await client.query(
       `INSERT INTO projects (workspace_id, name, target, created_by)
