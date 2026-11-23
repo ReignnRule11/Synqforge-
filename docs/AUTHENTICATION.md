@@ -12,14 +12,18 @@ This mapping is an identity adapter, not a replacement for OAuth verification. O
 
 Set these values in the server environment; never commit real credentials:
 
-- `AUTH_SECRET`: high-entropy Auth.js secret.
-- `GITHUB_CLIENT_ID`: GitHub OAuth application client ID.
-- `GITHUB_CLIENT_SECRET`: GitHub OAuth application secret.
+- `AUTH_SECRET`: high-entropy Auth.js secret. It must be configured in production.
+- `AUTH_GITHUB_ID`: GitHub OAuth application client ID. This is the Auth.js v5 provider-specific environment variable.
+- `AUTH_GITHUB_SECRET`: GitHub OAuth application secret.
 - `AUTH_URL`: canonical application origin where required by the hosting environment.
 
 Register the OAuth callback URL as `https://YOUR_HOST/api/auth/callback/github`. For local development use `http://localhost:3000/api/auth/callback/github`.
 
 The middleware protects application routes and sends unauthenticated visitors to `/signin`. Auth.js endpoints remain reachable so the OAuth flow can complete. The sign-in page uses a server action and does not accept an arbitrary callback URL.
+
+## Session identity enforcement
+
+The session callback fails closed if the JWT subject is absent or is not a UUID. A session without a verified database identity is never returned as an authenticated application session. The identity validator is covered by the auth test suite.
 
 ## Database integration gate
 
