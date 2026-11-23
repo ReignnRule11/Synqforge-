@@ -2,9 +2,9 @@
 
 ## Provider and session model
 
-SynqForge uses Auth.js with GitHub OAuth as its initial identity provider. The application uses encrypted/signed Auth.js JWT sessions; it does not accept user IDs from request bodies, query parameters, browser storage, or client-side state.
+SynqForge uses Auth.js with GitHub OAuth as its initial identity provider. The application uses Auth.js JWT sessions; database identity is never accepted from request bodies, query parameters, browser storage, or client-side state.
 
-The OAuth provider account ID is available to the JWT callback only after Auth.js completes the provider flow. SynqForge maps that verified numeric GitHub account ID to a stable UUIDv5 identity using a fixed namespace and the `github:` provider prefix. The UUID is stored as the Auth.js token subject and exposed through the server-verified session as `session.user.id`. The deterministic mapping means the same GitHub account receives the same database identity after a new sign-in.
+The OAuth provider account ID is available to the JWT callback only after Auth.js completes the provider flow. SynqForge maps that verified numeric GitHub account ID to a stable UUIDv5 identity using a fixed namespace and the `github:` provider prefix. The UUID is stored as the Auth.js token subject and exposed through the server-verified session as `session.user.id`.
 
 This mapping is an identity adapter, not a replacement for OAuth verification. Only use `githubUserIdToUuid` with the provider ID delivered by Auth.js callbacks.
 
@@ -13,34 +13,35 @@ This mapping is an identity adapter, not a replacement for OAuth verification. O
 Set these values in the server environment; never commit real credentials:
 
 - `AUTH_SECRET`: high-entropy Auth.js secret. It must be configured in production.
-- `AUTH_GITHUB_ID`: GitHub OAuth application client ID. This is the Auth.js v5 provider-specific environment variable.
+- `AUTH_GITHUB_ID`: GitHub OAuth application client ID.
 - `AUTH_GITHUB_SECRET`: GitHub OAuth application secret.
 - `AUTH_URL`: canonical application origin where required by the hosting environment.
+- `DATABASE_URL`: PostgreSQL connection string for the restricted `synqforge_app` runtime login only.
 
 Register the OAuth callback URL as `https://YOUR_HOST/api/auth/callback/github`. For local development use `http://localhost:3000/api/auth/callback/github`.
 
-The middleware protects application routes and sends unauthenticated visitors to `/signin`. Auth.js endpoints remain reachable so the OAuth flow can complete. The sign-in page uses a server action and does not accept an arbitrary callback URL.
+Administrative credentials are for migrations and controlled maintenance only. They must not be exposed to application runtime code or configured as `DATABASE_URL`.
 
 ## Session identity enforcement
 
-The session callback fails closed if the JWT subject is absent or is not a UUID. A session without a verified database identity is never returned as an authenticated application session. The identity validator is covered by the auth test suite.
+The Auth.js session callback fails closed if the JWT subject is absent or is not a UUIDv5 identity. The server-only `withCurrentUserTransaction` entry point calls `auth()`, validates the session identity, obtains the restricted runtime pool, and then invokes the existing transaction adapter. Its public signature accepts only a database callback; it has no user-ID, request-body, query-string, or client identity argument.
 
-## Database integration gate
+The runtime pool is isolated in a `server-only` module, lazily initialized from `DATABASE_URL`, and uses bounded connection settings. The transaction adapter sets the RLS identity transaction-locally and releases the client after commit or rollback.
 
-The session UUID is compatible with the existing PostgreSQL UUID identity context. A future server-only data access layer must:
+## API and authorization gate
 
-1. Call `auth()` and reject requests without a verified session and UUID.
-2. Pass only `session.user.id` to `withAuthenticatedUserTransaction`.
-3. Keep `DATABASE_URL` and all database credentials server-side.
-4. Use the restricted runtime login and transaction-local RLS identity.
-5. Enforce workspace role authorization in every handler.
+No workspace or project API routes are introduced in this milestone. Before exposing them:
 
-Do not create workspace/project API routes until the auth/session tests and the database-backed API authorization tests exist.
+1. Each server handler must use `withCurrentUserTransaction`; it must not call the lower-level transaction adapter with a caller-supplied identity.
+2. Workspace role authorization must be enforced for every operation, in addition to PostgreSQL RLS.
+3. API routes must return explicit JSON 401/403 responses rather than relying on page middleware redirects.
+4. PostgreSQL integration tests must cover unauthenticated access, forged client identity, cross-tenant reads/writes, and owner/admin/member/viewer permissions.
+5. Live OAuth and the authenticated API path must be exercised in a configured environment.
 
 ## Current limitations
 
 - GitHub is the first provider; additional providers require explicit identity namespace and account-linking design.
 - No user profile table or provider-account linking table is introduced in this milestone.
 - No workspace/project APIs are exposed yet.
-- OAuth cannot complete until deployment/local environment secrets and the GitHub callback URL are configured.
-- No production deployment or live OAuth verification is claimed by this change.
+- OAuth cannot complete until environment secrets and the GitHub callback URL are configured.
+- CI validates the session-to-database boundary with deterministic tests; it does not prove a live OAuth exchange or production deployment.
