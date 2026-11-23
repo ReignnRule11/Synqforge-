@@ -15,7 +15,7 @@
 - [x] PostgreSQL permission and bootstrap CI tests
 - [x] Transaction-scoped runtime adapter and pooled identity isolation tests
 - [x] Dedicated non-owner runtime login and least-privilege integration tests
-- [ ] Authentication/session provider and secure workspace onboarding
+- [x] Authentication/session provider and secure workspace onboarding
 - [ ] Migration runner and operational database configuration
 - [x] Authenticated workspace and project list/create API handlers with role-aware authorization
 - [x] Persistent project listing and creation UI scoped to the selected workspace
