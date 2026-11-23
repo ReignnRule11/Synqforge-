@@ -1,6 +1,6 @@
 import NextAuth from "next-auth";
 import GitHub from "next-auth/providers/github";
-import { githubUserIdToUuid } from "@/lib/auth/identity";
+import { githubUserIdToUuid } from "./src/lib/auth/identity";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   trustHost: true,
