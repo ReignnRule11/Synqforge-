@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type FormEvent } from "react";
 import { signOut } from "next-auth/react";
 import {
   Activity, ArrowUpRight, Atom, Blocks, Check, ChevronDown, CircleHelp,
@@ -50,7 +50,7 @@ export default function WorkspaceDashboard({ initialWorkspaces, userName, userEm
     [workspaces, search],
   );
 
-  async function createWorkspace(event: React.FormEvent<HTMLFormElement>) {
+  async function createWorkspace(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (creating) return;
     setCreating(true);
@@ -120,7 +120,7 @@ export default function WorkspaceDashboard({ initialWorkspaces, userName, userEm
           <section className="nav-group" key={group.label}>
             <div className="group-label">{group.label}</div>
             {group.items.map(([label, Icon]) => (
-              <button key={label} type="button" onClick={() => setActiveNav(label)} className={"nav-link " + (activeNav === label ? "active" : "")}>
+              <button key={label} type="button" disabled={label !== "Overview"} title={label !== "Overview" ? "Available in a later milestone" : undefined} onClick={() => setActiveNav(label)} className={"nav-link " + (activeNav === label ? "active" : "")}>
                 <Icon size={17} /><span>{label}</span>
               </button>
             ))}
