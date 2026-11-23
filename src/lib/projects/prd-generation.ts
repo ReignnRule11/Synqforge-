@@ -125,7 +125,7 @@ export function createPrdGenerationHandlers(deps: PrdGenerationDependencies) {
         return errorResponse("The configured AI provider could not produce a valid PRD within artifact limits. No artifact was saved.", 502);
       }
 
-      // Re-check and lock the membership row after the network call. A revoked or
+      // Re-check current membership and lock the project row after the network call. A revoked or
       // downgraded membership cannot persist output generated under stale access.
       const artifact = await deps.withCurrentUserTransaction(async (client) => {
         const access = await client.query(
