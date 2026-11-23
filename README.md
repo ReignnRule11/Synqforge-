@@ -25,7 +25,7 @@
 
 ## Current status
 
-Early repository foundation. No production AI, build sandbox, GitHub automation, or deployment orchestration is represented as connected until implemented and verified.
+The repository contains a responsive Next.js foundation and an initial Project Engine domain/schema. The Project Engine migration is not yet applied to a live database. Authentication, runtime persistence, project API routes, AI, build sandbox, GitHub automation, and deployment orchestration are not connected until implemented and verified.
 
 ## Local development
 
@@ -36,5 +36,10 @@ npm install
 npm run dev
 ```
 
-
 Open http://localhost:3000.
+
+## Project Engine schema
+
+Review [the data model and security contract](docs/PROJECT_ENGINE_DATA_MODEL.md). The initial PostgreSQL migration is at `database/migrations/0001_project_engine.sql`.
+
+Do not expose project APIs until a verified authentication session, transaction-scoped workspace authorization, and a non-BYPASSRLS runtime database role are configured.

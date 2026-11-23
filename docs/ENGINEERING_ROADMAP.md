@@ -6,11 +6,14 @@
 - Establish monorepo boundaries as backend/mobile become active
 
 ## Phase 1 — SynqForge Core
-- Project/workspace model and lifecycle states
-- User identity and access model
-- Project intake form and structured idea brief
-- Persistence and artifact versioning
-- Product workspace and task/activity ledger
+- [x] Project/workspace relational model and lifecycle states
+- [x] User membership and tenant isolation schema
+- [x] Project intake domain validation
+- [x] Artifact versioning and activity ledger schema
+- [ ] Authentication/session provider and workspace onboarding
+- [ ] PostgreSQL runtime adapter and migration runner
+- [ ] Authenticated project APIs and role-aware authorization
+- [ ] Persistent project UI and integration tests
 
 ## Phase 2 — Product Intelligence
 - Provider-agnostic AI gateway with strict typed outputs
