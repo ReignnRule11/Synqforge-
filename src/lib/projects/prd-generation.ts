@@ -1,8 +1,6 @@
 import type { PoolClient } from "pg";
 import { validatePrdOutput } from "../ai/contracts";
 import type { PrdOutput } from "../ai/contracts";
-import { createProviderConfig } from "../ai/provider";
-import { generatePrd } from "../ai/gateway";
 import { validateProjectArtifactInput } from "./artifacts";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -103,10 +101,15 @@ export function createPrdGenerationHandlers(deps: PrdGenerationDependencies) {
       if (project.kind === "forbidden") return errorResponse("Your workspace role does not allow PRD generation.", 403);
 
       let providerName: string;
+      try {
+        providerName = deps.createProviderConfig().provider;
+      } catch {
+        return errorResponse("AI generation is not configured. Contact the workspace administrator.", 503);
+      }
+
       let prd: PrdOutput;
       let artifactInput: ReturnType<typeof validateProjectArtifactInput>;
       try {
-        providerName = deps.createProviderConfig().provider;
         prd = validatePrdOutput(await deps.generatePrd({
           name: project.project.name,
           description: project.project.description,
@@ -186,12 +189,3 @@ export function createPrdGenerationHandlers(deps: PrdGenerationDependencies) {
   return { GET, POST };
 }
 
-// Keep the production dependency composition close to the handler contract.
-export const prdGenerationDependencies: PrdGenerationDependencies = {
-  withCurrentUserTransaction: async (work) => {
-    const { withCurrentUserTransaction } = await import("../auth/authenticated-db");
-    return withCurrentUserTransaction(work);
-  },
-  createProviderConfig,
-  generatePrd,
-};
