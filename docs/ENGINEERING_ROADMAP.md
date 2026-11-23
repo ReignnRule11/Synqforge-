@@ -16,7 +16,7 @@
 - [x] Transaction-scoped runtime adapter and pooled identity isolation tests
 - [x] Dedicated non-owner runtime login and least-privilege integration tests
 - [x] Authentication/session provider and secure workspace onboarding
-- [ ] Migration runner and operational database configuration
+- [x] Checksum-verified migration runner, advisory locking, and separate migration credentials
 - [x] Authenticated workspace and project list/create API handlers with role-aware authorization
 - [x] Persistent project listing and creation UI scoped to the selected workspace
 - [x] Project input validation and PostgreSQL role/tenant isolation tests
@@ -31,10 +31,12 @@
 - [ ] Browser-level end-to-end tests against a live Auth.js and PostgreSQL environment
 
 ## Phase 2 — Product Intelligence
-- Provider-agnostic AI gateway with strict typed outputs
+- [x] Provider-agnostic AI gateway with strict typed PRD output validation and fail-closed provider errors
+- [ ] Authenticated, tenant-scoped PRD generation endpoint and artifact persistence
 - Discovery, personas, problem framing, assumptions, validation plan
 - PRD, stories, acceptance criteria, roadmap artifacts
 - Sources and uncertainty labels
+- [ ] Browser-level end-to-end tests against a live Auth.js and PostgreSQL environment
 
 ## Phase 3 — Design & Architecture
 - UX flow generation and editable design specification
