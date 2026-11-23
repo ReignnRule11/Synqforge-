@@ -34,7 +34,7 @@ async function run() {
      WHERE n.nspname = 'public' AND c.relowner = (SELECT oid FROM pg_roles WHERE rolname = session_user)`,
   );
   assert.equal(ownership.rows[0]?.owned, 0, "runtime login must not own public objects");
-  await assert.rejects(runtime.query("CREATE TABLE public.runtime_forbidden_test (id integer)"), undefined,
+  await assert.rejects(runtime.query("CREATE TABLE public.runtime_forbidden_test (id integer)"), { code: "42501" },
     "runtime login must not create objects in public schema");
 
   await admin.query("DELETE FROM workspaces WHERE id = ANY($1::uuid[])", [[workspaceA, workspaceB]]);
@@ -63,7 +63,7 @@ async function run() {
     withAuthenticatedUserTransaction(runtime, userA, async (client) =>
       client.query("INSERT INTO workspace_memberships (workspace_id, user_id, role) VALUES ($1, $2, 'owner')", [workspaceA, userB]),
     ),
-    undefined,
+    { code: "42501" },
     "runtime must not directly mutate membership records",
   );
 
