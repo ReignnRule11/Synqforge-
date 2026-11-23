@@ -10,14 +10,14 @@
 - [x] User membership and tenant isolation schema
 - [x] Project intake domain validation
 - [x] Artifact versioning and activity ledger schema
-- [x] Role-aware RLS policies: read scopes, editor writes, admin deletes, append-only artifacts/activity
-- [x] Non-owner runtime database role and atomic workspace bootstrap function
-- [x] PostgreSQL 16 permission and bootstrap test workflow
+- [x] Role-aware RLS policies
+- [x] Non-owner runtime role and atomic workspace bootstrap
+- [x] PostgreSQL permission and bootstrap CI tests
+- [x] Transaction-scoped runtime adapter and pooled identity isolation tests
+- [x] Dedicated non-owner runtime login and least-privilege integration tests
 - [ ] Authentication/session provider and secure workspace onboarding
-- [ ] PostgreSQL runtime adapter and migration runner
-- [ ] Authenticated project APIs with role-aware authorization
-- [x] Database-backed role and cross-tenant integration tests (PostgreSQL CI)
-- [ ] Application-adapter tests for verified identity and pooled transaction isolation
+- [ ] Migration runner and operational database configuration
+- [ ] Authenticated workspace/project API handlers with role-aware authorization
 - [ ] Persistent project UI and integration tests
 
 ## Phase 2 — Product Intelligence
