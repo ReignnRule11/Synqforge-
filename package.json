@@ -18,7 +18,7 @@
     "test:project-domain": "tsx scripts/test-project-domain.ts",
     "test:project-artifacts": "tsx scripts/test-project-artifacts.ts",
     "test:ai-gateway": "NODE_OPTIONS=--conditions=react-server tsx scripts/test-ai-gateway.ts",
-    "test:prd-generation-route": "NODE_OPTIONS=--conditions=react-server tsx scripts/test-prd-generation-route.ts"
+    "test:prd-generation-route": "tsx scripts/test-prd-generation-route.ts"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",
