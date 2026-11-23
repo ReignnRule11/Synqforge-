@@ -9,14 +9,16 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test:postgres-runtime": "tsx scripts/test-postgres-runtime.ts"
+    "test:postgres-runtime": "tsx scripts/test-postgres-runtime.ts",
+    "test:auth-identity": "tsx scripts/test-auth-identity.ts"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",
     "next": "^15.5.6",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "pg": "^8.16.3"
+    "pg": "^8.16.3",
+    "next-auth": "^5.0.0-beta.25"
   },
   "devDependencies": {
     "@types/node": "^22.13.4",
