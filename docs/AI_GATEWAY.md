@@ -35,8 +35,14 @@ Each request has a 30-second timeout. HTTP errors, malformed provider responses,
 
 ## Data handling and limitations
 
-Sending a project brief to a provider transmits that content to the configured external service. A future authenticated route must authorize project membership and editor role before provider invocation, disclose the selected provider, and append only validated output. This gateway does not yet add a user-facing generation endpoint or automatic artifact write.
 
 ## Verification
 
 `npm run test:ai-gateway` tests shared PRD validation, provider selection/configuration, native request headers and payload shapes, malformed output, and provider failure propagation using deterministic local fixtures. It does not make live paid API calls.
+
+
+## Authenticated PRD generation
+
+The authenticated `POST /api/projects/{projectId}/generate-prd` route requires explicit `{ consent: true }` request consent. Before provider invocation it verifies the Auth.js session, project membership, and an owner/admin/member role. It sends the project name, description, target, and brief to the configured provider only after consent. The response is validated against the strict PRD contract and 64 KiB artifact limit, then appended as an immutable version with an activity event in the same database transaction. Access is checked again after the provider call; revoked access prevents persistence. The companion `GET` route discloses the configured provider and model to authenticated project members before consent.
+
+Sending a project brief transmits that content to the configured external service. The generated PRD is an unverified first draft and must be reviewed. No automatic provider failover is enabled.
