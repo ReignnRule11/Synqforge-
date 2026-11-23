@@ -190,6 +190,7 @@ async function main() {
     assert.equal(s.committedArtifacts, 1);
     assert.equal(s.committedActivities, 1);
     assert.match(s.sqlCalls.find((sql) => sql.includes("FOR UPDATE OF p")) ?? "", /FOR UPDATE OF p/);
+    assert.ok(s.sqlCalls.some((sql) => sql.includes("pg_advisory_xact_lock")), "version allocation must be serialized");
   }
   {
     const s = setup({ activityFailure: true });
