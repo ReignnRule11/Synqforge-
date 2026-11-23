@@ -9,6 +9,7 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
+    "db:migrate": "tsx scripts/migrate.ts",
     "test:postgres-runtime": "tsx scripts/test-postgres-runtime.ts",
     "test:auth-identity": "tsx scripts/test-auth-identity.ts",
     "test:auth-session-identity": "tsx scripts/test-auth-session-identity.ts",
