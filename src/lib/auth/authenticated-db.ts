@@ -16,6 +16,6 @@ export async function withCurrentUserTransaction<T>(
     async () => auth(),
     (verifiedUserId, callback) =>
       withAuthenticatedUserTransaction(getRuntimePool(), verifiedUserId, callback),
-    () => work as unknown as () => Promise<T>,
+    work,
   );
 }
