@@ -22,6 +22,9 @@
 - [x] Project input validation and PostgreSQL role/tenant isolation tests
 - [x] Persistent project UI and API integration surface for project detail and lifecycle updates
 - [x] Lifecycle transition domain validation and role-aware PostgreSQL update/activity tests
+- [x] Versioned project artifact API with immutable append-only document versions
+- [x] Project document history and editor UI for briefs, PRDs, stories, roadmaps, architecture, and other artifact types
+- [x] Artifact validation, version allocation, and role/tenant isolation PostgreSQL tests
 - [ ] Browser-level end-to-end tests against a live Auth.js and PostgreSQL environment
 
 ## Phase 2 — Product Intelligence
