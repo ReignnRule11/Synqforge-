@@ -10,9 +10,11 @@
 - [x] User membership and tenant isolation schema
 - [x] Project intake domain validation
 - [x] Artifact versioning and activity ledger schema
-- [ ] Authentication/session provider and workspace onboarding
+- [x] Role-aware RLS policies: read scopes, editor writes, admin deletes, append-only artifacts/activity
+- [ ] Authentication/session provider and secure workspace onboarding
 - [ ] PostgreSQL runtime adapter and migration runner
-- [ ] Authenticated project APIs and role-aware authorization
+- [ ] Authenticated project APIs with role-aware authorization
+- [ ] Database-backed role and cross-tenant integration tests
 - [ ] Persistent project UI and integration tests
 
 ## Phase 2 — Product Intelligence
