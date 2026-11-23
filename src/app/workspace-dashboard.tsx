@@ -134,7 +134,7 @@ export default function WorkspaceDashboard({ initialWorkspaces, userName, userEm
             <p>Workspace persistence is connected. Product creation is the next milestone.</p>
           </div>
           <button className="nav-link" type="button" onClick={() => setNotice("Documentation is not connected yet.")}><CircleHelp size={17} /><span>Help & documentation</span></button>
-          <button className="nav-link" type="button" onClick={() => setActiveNav("Settings")}><Settings2 size={17} /><span>Workspace settings</span></button>
+          <button className="nav-link" type="button" onClick={() => setNotice("Workspace settings will be enabled after the authorized settings API is implemented.")}><Settings2 size={17} /><span>Workspace settings</span></button>
           <div className="profile">
             <div className="avatar">{initials(userName)}</div>
             <div className="profile-copy"><b>{userName}</b><small>{userEmail || "GitHub account"}</small></div>
@@ -149,7 +149,7 @@ export default function WorkspaceDashboard({ initialWorkspaces, userName, userEm
           <div className="top-actions">
             <div className="search"><Search size={15} /><input aria-label="Search workspaces" placeholder="Search workspaces" value={search} onChange={(event) => setSearch(event.target.value)} /><kbd>/</kbd></div>
             <button className="icon-btn" type="button" aria-label="Activity" onClick={() => setNotice("Activity feed will be available after project events are connected.")}><Activity size={17} /></button>
-            <button className="icon-btn" type="button" aria-label="Settings" onClick={() => setActiveNav("Settings")}><Settings2 size={17} /></button>
+            <button className="icon-btn" type="button" aria-label="Settings" onClick={() => setNotice("Workspace settings will be enabled after the authorized settings API is implemented.")}><Settings2 size={17} /></button>
           </div>
         </header>
 
