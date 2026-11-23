@@ -134,7 +134,71 @@ async function run() {
     "adapter must reject invalid identity input",
   );
 
-  console.log("PASS: least-privilege runtime, tenant isolation, role-scoped workspace listing, bootstrap atomicity, and denial checks.");
+  const ownerProject = await withAuthenticatedUserTransaction(runtime, userA, async (client) => {
+    const result = await client.query(
+      `INSERT INTO projects (workspace_id, name, description, target, created_by)
+       VALUES ($1, 'Owner project', 'Created through the restricted runtime', 'web',
+               current_setting('app.user_id')::uuid)
+       RETURNING id, workspace_id, created_by`,
+      [workspaceA],
+    );
+    return result.rows[0] as { id: string; workspace_id: string; created_by: string };
+  });
+  assert.equal(ownerProject.workspace_id, workspaceA);
+  assert.equal(ownerProject.created_by, userA, "creator identity must come from transaction context");
+
+  const memberProject = await withAuthenticatedUserTransaction(runtime, memberUser, async (client) => {
+    const result = await client.query(
+      `INSERT INTO projects (workspace_id, name, target, created_by)
+       VALUES ($1, 'Member project', 'mobile', current_setting('app.user_id')::uuid)
+       RETURNING id`,
+      [workspaceA],
+    );
+    return result.rows[0].id as string;
+  });
+  assert.ok(memberProject, "workspace members with editor role can create projects");
+
+  const ownerProjects = await withAuthenticatedUserTransaction(runtime, userA, async (client) => {
+    const result = await client.query(
+      "SELECT id FROM projects WHERE workspace_id = $1 ORDER BY name",
+      [workspaceA],
+    );
+    return result.rows.map((row) => row.id);
+  });
+  assert.ok(ownerProjects.includes(ownerProject.id), "owner can list projects in own workspace");
+  assert.ok(ownerProjects.includes(memberProject), "owner can list member-created projects");
+
+  await assert.rejects(
+    withAuthenticatedUserTransaction(runtime, viewerUser, async (client) =>
+      client.query(
+        `INSERT INTO projects (workspace_id, name, target, created_by)
+         VALUES ($1, 'Viewer forbidden', 'web', current_setting('app.user_id')::uuid)`,
+        [workspaceA],
+      ),
+    ),
+    { code: "42501" },
+    "viewer must not create projects",
+  );
+
+  await assert.rejects(
+    withAuthenticatedUserTransaction(runtime, userB, async (client) =>
+      client.query(
+        `INSERT INTO projects (workspace_id, name, target, created_by)
+         VALUES ($1, 'Cross-tenant attack', 'web', current_setting('app.user_id')::uuid)`,
+        [workspaceA],
+      ),
+    ),
+    { code: "42501" },
+    "a valid workspace UUID must not bypass tenant membership checks",
+  );
+
+  const tenantBProjects = await withAuthenticatedUserTransaction(runtime, userB, async (client) => {
+    const result = await client.query("SELECT id FROM projects WHERE workspace_id = $1", [workspaceA]);
+    return result.rows;
+  });
+  assert.equal(tenantBProjects.length, 0, "cross-tenant project listing must return no rows");
+
+  console.log("PASS: least-privilege runtime, tenant isolation, workspace bootstrap, project CRUD authorization, and denial checks.");
 }
 run()
   .catch(async (error) => {
