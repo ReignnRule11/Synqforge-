@@ -16,7 +16,8 @@
     "test:authenticated-db-boundary": "tsx scripts/test-authenticated-db-boundary.ts",
     "test:workspace-domain": "tsx scripts/test-workspace-domain.ts",
     "test:project-domain": "tsx scripts/test-project-domain.ts",
-    "test:project-artifacts": "tsx scripts/test-project-artifacts.ts"
+    "test:project-artifacts": "tsx scripts/test-project-artifacts.ts",
+    "test:ai-gateway": "NODE_OPTIONS=--conditions=react-server tsx scripts/test-ai-gateway.ts"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",
