@@ -28,9 +28,18 @@ jobs:
           --health-retries 10
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install dependencies
+        run: npm install
       - name: Install PostgreSQL client
         run: sudo apt-get update && sudo apt-get install -y postgresql-client
       - name: Apply migrations and run RLS/bootstrap tests
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/synqforge_test
         run: bash scripts/test-postgres-permissions.sh
+      - name: Test server transaction identity and pooled isolation
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/synqforge_test
+        run: npm run test:postgres-runtime
