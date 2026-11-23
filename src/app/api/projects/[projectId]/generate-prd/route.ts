@@ -26,6 +26,34 @@ function statusFor(error: unknown): number {
  * Generate a first-draft PRD. The caller must explicitly consent to sending
  * this project's brief to the currently configured external AI provider.
  */
+/** Return the selected provider so the UI can disclose the recipient before consent. */
+export async function GET(_request: Request, { params }: RouteContext) {
+  const { projectId } = await params;
+  if (!UUID_PATTERN.test(projectId)) return errorResponse("A valid project ID is required.", 422);
+  try {
+    const access = await withCurrentUserTransaction(async (client) => {
+      const result = await client.query(
+        `SELECT m.role
+         FROM projects p
+         JOIN workspace_memberships m
+           ON m.workspace_id = p.workspace_id
+          AND m.user_id = current_setting('app.user_id')::uuid
+         WHERE p.id = $1`,
+        [projectId],
+      );
+      return result.rows[0] as { role: string } | undefined;
+    });
+    if (!access) return errorResponse("Project not found.", 404);
+    const configured = createProviderConfig();
+    return NextResponse.json({ provider: configured.provider, model: configured.config.model });
+  } catch (error) {
+    const status = statusFor(error);
+    if (status === 401) return errorResponse("Authentication required.", 401);
+    if (status === 403) return errorResponse("You do not have access to this project.", 403);
+    return errorResponse("AI provider is not configured.", 503);
+  }
+}
+
 export async function POST(request: Request, { params }: RouteContext) {
   const { projectId } = await params;
   if (!UUID_PATTERN.test(projectId)) return errorResponse("A valid project ID is required.", 422);
