@@ -2,7 +2,7 @@
 
 ## Scope
 
-Migrations `0001_project_engine.sql` and `0002_role_based_rls.sql` establish the first persistent domain for SynqForge: workspaces, memberships, projects, versioned artifacts, and an append-only activity timeline.
+Migrations `0001_project_engine.sql` through `0003_secure_workspace_bootstrap.sql` establish workspaces, memberships, projects, versioned artifacts, activity, role-aware RLS, runtime grants, and atomic workspace bootstrap.
 
 ## Domain rules
 
@@ -30,30 +30,51 @@ Migrations `0001_project_engine.sql` and `0002_role_based_rls.sql` establish the
 | Modify/delete activity events | No | No | No | No |
 | Manage memberships through client SQL | No | No | No | No |
 
-Membership creation, role changes, and invitations are intentionally unavailable through direct client SQL. They require a separately reviewed trusted onboarding/invitation path.
+Membership creation, role changes, and invitations remain unavailable through direct client SQL. Workspace creation is only available through the trusted atomic bootstrap function described below.
 
 ## Database security
 
 Row-level security is enabled on all five tables. Every application transaction that accesses workspace data must set transaction-local identity context:
 
 ```sql
-SELECT set_config('app.user_id', :authenticated_user_uuid, true);
+SELECT set_config('app.user_id', :verified_authenticated_user_uuid, true);
 ```
 
-The user UUID must come from a verified authentication session, never from an untrusted request field. The application must authorize the selected workspace through the authenticated user's membership before each operation. The current policies derive workspace access from membership; `app.workspace_id` is not an authorization substitute.
+The UUID must be derived by the trusted server from a verified authentication session/token. Never accept it from a request body, query parameter, browser storage, or mobile client. The policies derive workspace access from membership; `app.workspace_id` is not an authorization substitute.
 
-Use a non-owner database role without BYPASSRLS; migration credentials must not be used by the runtime. Table owners and roles with BYPASSRLS can bypass ordinary RLS protections. API authorization must still enforce the same role matrix and validate lifecycle transitions.
+Migration `0003` creates the non-login `synqforge_app` role. It is not a table owner and does not have `BYPASSRLS`. The server's dedicated login role should be granted membership in `synqforge_app` and inherit its limited grants; it must not be a table owner, superuser, or have `BYPASSRLS`. Migration credentials must never be used at runtime.
 
-The initial schema and hardening migration do not create a public unauthenticated project API. API routes remain gated on a verified identity provider and transaction-scoped database adapter. Do not disable RLS or substitute client-supplied user IDs to make endpoints work.
+The custom `app.user_id` setting is not cryptographic authentication. A caller with direct SQL access to the runtime credential could set it. Therefore the database credential and connection pool must remain server-side; do not connect browsers/mobile clients directly with this credential. API authorization must still enforce the same role matrix and validate lifecycle transitions.
+
+## Secure workspace bootstrap
+
+Migration `0003_secure_workspace_bootstrap.sql` creates `public.create_workspace(name, slug)`. It accepts no user ID. It reads `app.user_id`, validates the identity and input, inserts the workspace, and inserts the caller's `owner` membership in the same database transaction. If either insert fails, PostgreSQL rolls back the statement, so no orphan workspace is created.
+
+The function is `SECURITY DEFINER`, uses a fixed search path, is not executable by `PUBLIC`, and is executable only by `synqforge_app`. This is a trusted-server operation, not a public database API. The server must verify the user's authentication token before setting the transaction-local identity and calling it.
+
+## PostgreSQL-backed tests
+
+Run against a disposable PostgreSQL database with a migration-capable administrator:
+
+```bash
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/synqforge_test \
+  bash scripts/test-postgres-permissions.sh
+```
+
+The suite applies all migrations and exercises actual RLS policies as the non-owner runtime role. It covers owner/admin/member/viewer permissions, cross-workspace read/write isolation, append-only artifact/activity records, missing identity denial, and owner membership creation. GitHub Actions runs it against PostgreSQL 16.
+
+## API exposure gate
+
+No workspace or project API route should be added until a real authentication provider verifies sessions/tokens, the server derives user identity from that verified session, a pooled PostgreSQL connection uses a non-owner login inheriting `synqforge_app`, and each request sets transaction-local identity and authorizes workspace membership/role. Add application-adapter integration tests proving identity context cannot leak between pooled transactions. Do not disable RLS or substitute client-supplied user IDs to make endpoints work.
 
 ## Migration
 
-Apply migrations in lexical order using a dedicated migration identity. Back up an existing database before applying schema changes. Migration `0002_role_based_rls.sql` replaces broad member-write policies with role-aware policies. It does not create an owner bootstrap path; workspace creation and membership provisioning must be implemented through a trusted, atomic onboarding operation before workspace creation is exposed.
+Apply migrations in lexical order using a dedicated migration identity. Back up an existing database before applying schema changes. Migration `0002_role_based_rls.sql` replaces broad member-write policies with role-aware policies; migration `0003_secure_workspace_bootstrap.sql` adds the runtime role and bootstrap function.
 
 ## Not yet implemented
 
-- Authentication/session provider and secure workspace onboarding/invitations
+- Authentication/session provider and verified identity integration
 - PostgreSQL runtime connection pool and migration runner
-- API handlers and integration tests against PostgreSQL
-- Database-backed tests proving viewer/member/admin/owner permissions and cross-tenant isolation
+- Workspace/project API handlers (intentionally gated on the security prerequisites above)
+- Application-adapter integration tests for verified identity and pooled transaction isolation
 - Automated updated_at triggers
