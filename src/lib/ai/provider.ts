@@ -144,7 +144,7 @@ export class AnthropicProvider implements TextGenerationProvider {
     const text = payload.content
       .filter((block): block is Record<string, unknown> => !!block && typeof block === "object" && !Array.isArray(block))
       .filter((block) => block.type === "text" && typeof block.text === "string")
-      .map((block) => block.text as string).join("\\n");
+      .map((block) => block.text as string).join("\n");
     return nonEmptyText(text);
   }
 }
@@ -175,7 +175,7 @@ export class GeminiProvider implements TextGenerationProvider {
     const text = content.parts
       .filter((part): part is Record<string, unknown> => !!part && typeof part === "object" && !Array.isArray(part))
       .filter((part) => typeof part.text === "string")
-      .map((part) => part.text as string).join("\\n");
+      .map((part) => part.text as string).join("\n");
     return nonEmptyText(text);
   }
 }
