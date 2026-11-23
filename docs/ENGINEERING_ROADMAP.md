@@ -20,7 +20,9 @@
 - [x] Authenticated workspace and project list/create API handlers with role-aware authorization
 - [x] Persistent project listing and creation UI scoped to the selected workspace
 - [x] Project input validation and PostgreSQL role/tenant isolation tests
-- [ ] Persistent project UI and integration tests
+- [x] Persistent project UI and API integration surface for project detail and lifecycle updates
+- [x] Lifecycle transition domain validation and role-aware PostgreSQL update/activity tests
+- [ ] Browser-level end-to-end tests against a live Auth.js and PostgreSQL environment
 
 ## Phase 2 — Product Intelligence
 - Provider-agnostic AI gateway with strict typed outputs
