@@ -1,19 +1,15 @@
-import { NextResponse } from "next/server";
-import { createPrdGenerationHandlers, prdGenerationDependencies } from "@/lib/projects/prd-generation";
+import { withCurrentUserTransaction } from "@/lib/auth/authenticated-db";
+import { generatePrd } from "@/lib/ai/gateway";
+import { createProviderConfig } from "@/lib/ai/provider";
+import { createPrdGenerationHandlers } from "@/lib/projects/prd-generation";
 
 export const runtime = "nodejs";
 
 const handlers = createPrdGenerationHandlers({
-  ...prdGenerationDependencies,
-  // Keep NextResponse as the framework response implementation in production.
+  withCurrentUserTransaction,
+  createProviderConfig,
+  generatePrd,
 });
 
-export const GET = async (request: Request, context: { params: Promise<{ projectId: string }> }) => {
-  const response = await handlers.GET(request, context);
-  return NextResponse.json(await response.json(), { status: response.status, headers: response.headers });
-};
-
-export const POST = async (request: Request, context: { params: Promise<{ projectId: string }> }) => {
-  const response = await handlers.POST(request, context);
-  return NextResponse.json(await response.json(), { status: response.status, headers: response.headers });
-};
+export const GET = handlers.GET;
+export const POST = handlers.POST;
