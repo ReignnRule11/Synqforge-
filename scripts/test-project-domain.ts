@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { validateProjectInput } from "../src/lib/projects/domain";
+import { allowedProjectTransitions, canTransitionProject, isProjectStatus, validateProjectInput } from "../src/lib/projects/domain";
 
 assert.deepEqual(
   validateProjectInput({ name: "  SynqForge  ", description: " Product platform ", target: "web_mobile" }),
@@ -13,4 +13,12 @@ assert.throws(() => validateProjectInput({ name: "Valid name", description: "x".
 for (const target of ["desktop", "WEB", null, 1, undefined]) {
   assert.throws(() => validateProjectInput({ name: "Valid name", target }));
 }
-console.log("PASS: project input normalization, bounds, and target allowlist.");
+assert.equal(isProjectStatus("idea"), true);
+assert.equal(isProjectStatus("unknown"), false);
+assert.deepEqual(allowedProjectTransitions("idea"), ["discovery", "archived"]);
+assert.equal(canTransitionProject("idea", "discovery"), true);
+assert.equal(canTransitionProject("idea", "building"), false);
+assert.equal(canTransitionProject("archived", "idea"), true);
+assert.equal(canTransitionProject("building", "building"), true);
+
+console.log("PASS: project input validation and lifecycle transition rules.");
