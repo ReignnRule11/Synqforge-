@@ -17,7 +17,9 @@
 - [x] Dedicated non-owner runtime login and least-privilege integration tests
 - [ ] Authentication/session provider and secure workspace onboarding
 - [ ] Migration runner and operational database configuration
-- [ ] Authenticated workspace/project API handlers with role-aware authorization
+- [x] Authenticated workspace and project list/create API handlers with role-aware authorization
+- [x] Persistent project listing and creation UI scoped to the selected workspace
+- [x] Project input validation and PostgreSQL role/tenant isolation tests
 - [ ] Persistent project UI and integration tests
 
 ## Phase 2 — Product Intelligence
