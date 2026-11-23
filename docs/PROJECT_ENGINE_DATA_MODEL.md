@@ -78,3 +78,10 @@ Apply migrations in lexical order using a dedicated migration identity. Back up 
 - Workspace/project API handlers (intentionally gated on the security prerequisites above)
 - Application-adapter integration tests for verified identity and pooled transaction isolation
 - Automated updated_at triggers
+
+
+## Server runtime transaction adapter
+
+`src/lib/db/runtime.ts` provides `withAuthenticatedUserTransaction(pool, verifiedUserId, work)`. It validates the UUID, starts a transaction, switches to the restricted `synqforge_app` role, sets `app.user_id` transaction-locally, executes the callback, and commits. Errors trigger rollback and the pooled client is always released. Callers must derive `verifiedUserId` from a verified server-side auth session; this adapter is not an authentication mechanism.
+
+The PostgreSQL CI job also runs `scripts/test-postgres-runtime.ts` using a single-connection pool to exercise sequential tenant identities and workspace bootstrap. The current CI test connection uses the PostgreSQL service administrator credential; it verifies adapter transaction behavior and RLS outcomes but does not yet prove that a separate runtime login has only the intended grants. That least-privilege login test remains a follow-up security gate.
