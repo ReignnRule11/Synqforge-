@@ -74,6 +74,10 @@ export default function WorkspaceDashboard({ initialWorkspaces, userName, userEm
   const [artifactTitle, setArtifactTitle] = useState("");
   const [artifactContent, setArtifactContent] = useState('{"summary":"","problem":"","audience":"","solution":""}');
   const [artifactSaving, setArtifactSaving] = useState(false);
+  const [prdProvider, setPrdProvider] = useState<{ provider: string; model: string } | null>(null);
+  const [prdProviderError, setPrdProviderError] = useState("");
+  const [prdConsent, setPrdConsent] = useState(false);
+  const [prdGenerating, setPrdGenerating] = useState(false);
 
 
 
@@ -107,6 +111,46 @@ export default function WorkspaceDashboard({ initialWorkspaces, userName, userEm
       .finally(() => { if (!cancelled) setArtifactsLoading(false); });
     return () => { cancelled = true; };
   }, [selectedProject?.id]);
+
+  useEffect(() => {
+    if (!selectedProject) { setPrdProvider(null); setPrdProviderError(""); setPrdConsent(false); return; }
+    let cancelled = false;
+    setPrdProvider(null);
+    setPrdProviderError("");
+    setPrdConsent(false);
+    fetch(`/api/projects/${encodeURIComponent(selectedProject.id)}/generate-prd`)
+      .then(async (response) => {
+        const payload = await response.json().catch(() => ({})) as { provider?: string; model?: string; error?: string };
+        if (!response.ok || !payload.provider || !payload.model) throw new Error(payload.error || "AI provider details could not be loaded.");
+        if (!cancelled) setPrdProvider({ provider: payload.provider, model: payload.model });
+      })
+      .catch((cause) => { if (!cancelled) setPrdProviderError(cause instanceof Error ? cause.message : "AI provider details could not be loaded."); });
+    return () => { cancelled = true; };
+  }, [selectedProject?.id]);
+
+  async function generateProjectPrd() {
+    if (!selectedProject || !prdConsent || prdGenerating || activeWorkspace?.role === "viewer") return;
+    setPrdGenerating(true);
+    setDetailError("");
+    try {
+      const response = await fetch(`/api/projects/${encodeURIComponent(selectedProject.id)}/generate-prd`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ consent: true }),
+      });
+      const payload = await response.json().catch(() => ({})) as { artifact?: Artifact; provider?: string; error?: string };
+      if (!response.ok || !payload.artifact) throw new Error(payload.error || "PRD generation failed.");
+      setArtifacts((current) => [payload.artifact!, ...current]);
+      setArtifactType("prd");
+      setArtifactTitle("");
+      setPrdConsent(false);
+      setNotice(`Generated PRD version ${payload.artifact.version} using ${payload.provider || prdProvider?.provider || "the configured provider"}.`);
+    } catch (cause) {
+      setDetailError(cause instanceof Error ? cause.message : "PRD generation failed.");
+    } finally {
+      setPrdGenerating(false);
+    }
+  }
 
   async function createArtifact(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -414,6 +458,18 @@ export default function WorkspaceDashboard({ initialWorkspaces, userName, userEm
               <button className="primary modal-submit" type="button" disabled={statusSaving || nextProjectStatus === selectedProject.status} onClick={() => void saveProjectStatus()}>{statusSaving ? "Saving status…" : "Save lifecycle status"} <ArrowUpRight size={16} /></button>
             )}
             <div className="artifact-section">
+              {activeWorkspace?.role !== "viewer" && (
+                <div className="artifact-form">
+                  <div className="panel-head"><div><h3>AI-assisted PRD</h3><p>Generate a first draft from this project brief.</p></div><span className="tag">NATIVE AI</span></div>
+                  {prdProvider ? (
+                    <>
+                      <p className="modal-disclaimer">Configured recipient: <b>{prdProvider.provider}</b> · model <b>{prdProvider.model}</b>. Your project name, description, target, and brief will be sent to this external provider. The result is a draft and must be reviewed.</p>
+                      <label className="consent-row"><input type="checkbox" checked={prdConsent} onChange={(event) => setPrdConsent(event.target.checked)} /> I agree to send this project information to {prdProvider.provider} for PRD generation.</label>
+                      <button className="primary modal-submit" type="button" disabled={!prdConsent || prdGenerating} onClick={() => void generateProjectPrd()}>{prdGenerating ? "Generating PRD…" : "Generate and save PRD"} <Sparkles size={16} /></button>
+                    </>
+                  ) : <p className="modal-disclaimer">{prdProviderError || "Checking configured AI provider…"}</p>}
+                </div>
+              )}
               <div className="panel-head"><div><h3>Project documents</h3><p>Immutable, versioned artifacts attached to this project.</p></div><span className="tag">{artifacts.length} VERSIONS</span></div>
               {artifactsLoading ? <p>Loading document history…</p> : artifacts.length ? (
                 <div className="artifact-list">{artifacts.map((artifact) => (
