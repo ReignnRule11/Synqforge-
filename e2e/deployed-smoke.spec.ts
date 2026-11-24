@@ -30,12 +30,11 @@ test("a second authenticated user cannot read the first user's project", async (
 
   const stateA = JSON.parse(userAState!);
   const stateB = JSON.parse(userBState!);
-  const bypassHeaders = process.env.VERCEL_AUTOMATION_BYPASS_SECRET
-    ? {
-        "x-vercel-protection-bypass": process.env.VERCEL_AUTOMATION_BYPASS_SECRET,
-        "x-vercel-set-bypass-cookie": "true",
-      }
-    : {};
+  const bypassHeaders: Record<string, string> = {};
+  if (process.env.VERCEL_AUTOMATION_BYPASS_SECRET) {
+    bypassHeaders["x-vercel-protection-bypass"] = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+    bypassHeaders["x-vercel-set-bypass-cookie"] = "true";
+  }
   const userA = await browser.newContext({ storageState: stateA, extraHTTPHeaders: bypassHeaders });
   const userB = await browser.newContext({ storageState: stateB, extraHTTPHeaders: bypassHeaders });
 
