@@ -54,6 +54,7 @@
 - [ ] Establish and enforce defensible global/per-file coverage thresholds from repeated CI baselines
 - [x] Live PostgreSQL runtime tests verify transaction-local role/identity, rollback behavior, and pooled-connection identity reset across tenant reuse
 - [x] AI provider resilience tests cover network rejection, HTTP errors, malformed response JSON, abort timeouts, and secret-safe transport errors
+- [x] PostgreSQL artifact integrity tests cover failed-write rollback, concurrent version allocation across separate pooled connections, and one-to-one artifact/activity event consistency
 - [ ] Extend live PostgreSQL integration coverage to Auth.js session-to-runtime adapter wiring and production-like deployed authentication
 
 ## Phase 6 — GitHub and Deploy
