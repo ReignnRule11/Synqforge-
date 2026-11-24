@@ -1,0 +1,18 @@
+{
+  "all": true,
+  "include": [
+    "src/lib/ai/**/*.ts",
+    "src/lib/auth/**/*.ts",
+    "src/lib/projects/**/*.ts",
+    "src/lib/workspaces/**/*.ts"
+  ],
+  "exclude": [
+    "**/*.d.ts"
+  ],
+  "reporter": [
+    "text",
+    "lcov"
+  ],
+  "reports-dir": "coverage",
+  "clean": true
+}
