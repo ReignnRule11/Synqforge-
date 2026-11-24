@@ -49,7 +49,8 @@
 - [ ] Enable and verify GitHub native secret-scanning alerts and push protection
 - [x] Dependency Review workflow verified successfully on PR #32
 - [ ] Bounded repair iterations with explicit diffs and approval gates
-- [ ] Coverage instrumentation and enforced thresholds after adopting a compatible coverage runner
+- [x] V8 coverage instrumentation with text/LCOV reports for AI, auth, project, and workspace domain modules; CI publishes a seven-day report artifact
+- [ ] Establish and enforce coverage thresholds after reviewing the measured baseline and strengthening under-covered security-critical paths
 
 ## Phase 6 — GitHub and Deploy
 - [ ] Revocable GitHub repository integration with minimum scopes
