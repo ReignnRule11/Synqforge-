@@ -52,7 +52,8 @@
 - [x] V8 coverage instrumentation with text/LCOV reports for AI, auth, project, and workspace domain modules; CI publishes a seven-day report artifact
 - [x] Current-user transaction orchestration extracted behind a dependency seam and tested for verified identity, invalid sessions, auth failure, and database failure
 - [ ] Establish and enforce defensible global/per-file coverage thresholds from repeated CI baselines
-- [ ] Add live PostgreSQL runtime integration coverage for current-user adapter and RLS enforcement
+- [x] Live PostgreSQL runtime tests verify transaction-local role/identity, rollback behavior, and pooled-connection identity reset across tenant reuse
+- [ ] Extend live PostgreSQL integration coverage to Auth.js session-to-runtime adapter wiring and production-like deployed authentication
 
 ## Phase 6 — GitHub and Deploy
 - [ ] Revocable GitHub repository integration with minimum scopes
