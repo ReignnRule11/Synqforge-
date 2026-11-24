@@ -81,6 +81,54 @@ async function main() {
     return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(valid) }] } }] }), { status: 200 });
   }).generate({ system: "system", prompt: "prompt", maxOutputTokens: 500 });
 
+
+  // Provider transport failures must be bounded, deterministic, and secret-safe.
+  const networkFailure = new OpenAICompatibleProvider(config, async () => {
+    throw new Error("request failed for Authorization: secret-test");
+  });
+  await assert.rejects(
+    networkFailure.generate({ system: "system", prompt: "prompt", maxOutputTokens: 100 }),
+    (error: unknown) => error instanceof Error &&
+      error.message === "AI provider network request failed." &&
+      !error.message.includes(config.apiKey),
+  );
+
+  const httpFailure = new OpenAICompatibleProvider(config, async () =>
+    new Response("provider body may contain sensitive data", { status: 429 }),
+  );
+  await assert.rejects(
+    httpFailure.generate({ system: "system", prompt: "prompt", maxOutputTokens: 100 }),
+    (error: unknown) => error instanceof Error &&
+      error.message === "AI provider request failed with HTTP 429." &&
+      !error.message.includes("sensitive"),
+  );
+
+  const malformedProviderJson = new OpenAICompatibleProvider(config, async () =>
+    new Response("{invalid-json", { status: 200, headers: { "Content-Type": "application/json" } }),
+  );
+  await assert.rejects(
+    malformedProviderJson.generate({ system: "system", prompt: "prompt", maxOutputTokens: 100 }),
+    /AI provider returned malformed JSON/,
+  );
+
+  const slowProvider = new OpenAICompatibleProvider(
+    config,
+    async (_input, init) => new Promise<Response>((_resolve, reject) => {
+      const signal = init?.signal;
+      if (!signal) return reject(new Error("AbortSignal missing"));
+      signal.addEventListener("abort", () => {
+        const error = new Error("aborted");
+        error.name = "AbortError";
+        reject(error);
+      }, { once: true });
+    }),
+    5,
+  );
+  await assert.rejects(
+    slowProvider.generate({ system: "system", prompt: "prompt", maxOutputTokens: 100 }),
+    /AI provider request timed out/,
+  );
+
   console.log("AI gateway contract and multi-provider adapter tests passed.");
 }
 
