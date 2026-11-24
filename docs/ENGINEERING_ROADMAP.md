@@ -47,10 +47,12 @@
 - [ ] Authenticated cross-tenant browser verification using two dedicated test identities and a live project
 - [x] CI secret scanning via Gitleaks on pull requests, main pushes, and a weekly schedule
 - [ ] Enable and verify GitHub native secret-scanning alerts and push protection
-- [x] Dependency Review workflow verified successfully on PR #32
 - [ ] Bounded repair iterations with explicit diffs and approval gates
+- [x] Dependency Review workflow verified successfully on PR #32
 - [x] V8 coverage instrumentation with text/LCOV reports for AI, auth, project, and workspace domain modules; CI publishes a seven-day report artifact
-- [ ] Establish and enforce coverage thresholds after reviewing the measured baseline and strengthening under-covered security-critical paths
+- [x] Current-user transaction orchestration extracted behind a dependency seam and tested for verified identity, invalid sessions, auth failure, and database failure
+- [ ] Establish and enforce defensible global/per-file coverage thresholds from repeated CI baselines
+- [ ] Add live PostgreSQL runtime integration coverage for current-user adapter and RLS enforcement
 
 ## Phase 6 — GitHub and Deploy
 - [ ] Revocable GitHub repository integration with minimum scopes
