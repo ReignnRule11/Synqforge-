@@ -1,39 +1,26 @@
 # Authenticated Project API
 
-Projects are scoped to a workspace. The workspace identifier is an untrusted resource selector, not an identity or authorization claim.
+Projects are scoped to a workspace. A workspace identifier is an untrusted resource selector, not an identity or authorization claim.
 
 ## Endpoints
 
-### `GET /api/projects?workspace_id=<uuid>`
+- `GET /api/projects?workspace_id=<uuid>` — list projects visible to the authenticated user in the selected workspace.
+- `POST /api/projects` — create a project in an authorized workspace.
+- `GET /api/projects/:projectId` — retrieve an authorized project and its lifecycle state.
+- `PATCH /api/projects/:projectId` — request a validated lifecycle transition.
 
-Returns projects visible to the current authenticated user in the selected workspace. A valid workspace UUID that belongs to another tenant returns an empty list under PostgreSQL row-level security.
-
-### `POST /api/projects`
-
-Accepts JSON:
-
-```json
-{
-  "workspace_id": "workspace UUID",
-  "name": "Product name",
-  "description": "Optional product description",
-  "target": "web"
-}
-```
-
-Supported targets: `web`, `mobile`, `web_mobile`. Project status is initialized by the database to `idea`; callers cannot assign creator identity or status.
+Project creation accepts `workspace_id`, `name`, optional `description`, and target (`web`, `mobile`, or `web_mobile`). Status and creator identity are assigned by trusted server/database logic, not by the client.
 
 ## Security boundary
 
-- The route calls `withCurrentUserTransaction`; the user UUID comes only from the verified Auth.js server session.
-- The restricted PostgreSQL runtime role sets transaction-local `app.user_id`.
-- `created_by` is derived inside SQL from that transaction context, never from request JSON.
-- Workspace membership and editor permissions are enforced by PostgreSQL RLS. Owners, admins, and members may create; viewers are read-only.
-- A foreign workspace UUID cannot grant access. RLS blocks inserts and filters reads even when a caller supplies a valid UUID.
-- The route does not expose project update/delete, membership administration, invitations, or project lifecycle transitions.
+- Routes call `withCurrentUserTransaction`; user identity comes only from the verified Auth.js server session.
+- `created_by` is derived from transaction-local `app.user_id`, never request JSON.
+- Workspace membership and editor permissions are enforced by PostgreSQL RLS.
+- Owners, admins, and members can perform permitted writes; viewers are read-only.
+- A foreign workspace UUID cannot grant access.
+- Lifecycle transitions are validated server-side and recorded in the append-only activity ledger.
+- Membership administration, invitations, and project deletion are not exposed.
 
 ## Verification
 
-- `npm run test:project-domain` validates input normalization, bounds, and target allowlisting.
-- `npm run test:postgres-runtime` exercises owner/member creation, viewer denial, creator identity binding, and cross-tenant read/write isolation using the non-owner runtime login.
-- CI also runs typecheck, lint, build, and the PostgreSQL RLS workflow.
+CI runs project-domain tests, authenticated route tests, and PostgreSQL RLS/least-privilege tests. These do not constitute a live browser/OAuth smoke test.

@@ -98,6 +98,7 @@ function setup(scenario: Scenario = {}) {
       if (scenario.providerFailure) throw new Error("provider unavailable");
       if (scenario.invalidPrd) return { ...validPrd, unexpected: "rejected" } as never;
       if (scenario.oversizedPrd) return { ...validPrd, goals: Array.from({ length: 20 }, () => "x".repeat(1000)) } as never;
+      if (scenario.oversizedPrd) return { ...validPrd, ...Object.fromEntries(["targetUsers", "goals", "nonGoals", "userStories", "functionalRequirements", "acceptanceCriteria", "assumptions", "risks", "openQuestions"].map((field) => [field, Array.from({ length: 20 }, () => "x".repeat(1000))])) } as never;
       return validPrd;
     },
   };
@@ -190,6 +191,8 @@ async function main() {
     assert.equal(s.committedArtifacts, 1);
     assert.equal(s.committedActivities, 1);
     assert.match(s.sqlCalls.find((sql) => sql.includes("FOR UPDATE OF p, m")) ?? "", /FOR UPDATE OF p, m/);
+    assert.match(s.sqlCalls.find((sql) => sql.includes("FOR UPDATE OF p")) ?? "", /FOR UPDATE OF p/);
+    assert.ok(s.sqlCalls.some((sql) => sql.includes("pg_advisory_xact_lock")), "version allocation must be serialized");
   }
   {
     const s = setup({ activityFailure: true });

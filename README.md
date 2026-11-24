@@ -2,46 +2,47 @@
 
 [![SynqForge CI](https://github.com/ReignnRule11/Synqforge-/actions/workflows/ci.yml/badge.svg)](https://github.com/ReignnRule11/Synqforge-/actions/workflows/ci.yml)
 
-**From idea to industry.** SynqForge is an autonomous product creation and lifecycle platform designed to help founders turn ideas into validated product plans, architecture, real applications, tests, and deployments from one workspace.
+**From idea to industry.** SynqForge is a product creation and lifecycle workspace designed to help founders move from an idea toward validated plans, architecture, implementation, and deployment.
 
-## Product direction
+## Implemented foundation
 
-- Idea intake and product intelligence
-- Evidence-backed discovery, validation, and requirements
-- Editable PRDs, user stories, milestones, and product artifacts
-- UX and design-system planning
-- Architecture, database, and API design
-- Real application code generation across web and mobile targets
-- Sandboxed builds, tests, and quality gates
-- GitHub integration and controlled deployments
-- Persistent agents with transparent tasks, approvals, and logs
+- Auth.js v5 GitHub OAuth with JWT sessions and server-verified identity.
+- PostgreSQL workspace and project data model with tenant isolation and role-aware row-level security.
+- Restricted application database role, transaction-scoped identity, and checksum-verified migration runner.
+- Authenticated workspace bootstrap, listing, and project list/create APIs.
+- Project detail retrieval and validated lifecycle transitions.
+- Immutable, versioned project artifacts with append-only activity records.
+- Provider-backed PRD generation through OpenAI, Anthropic Claude, Gemini, or an OpenAI-compatible endpoint.
+- Explicit consent before project brief data is sent to the selected external AI provider.
+- Automated unit, route-boundary, and PostgreSQL security tests in GitHub Actions.
 
-## Development principles
+## Current PRD-generation flow
 
-- Real implementations over mock functionality
-- Explicitly label demo data and unconnected integrations
-- Human approval for consequential actions
-- Security, tenant isolation, and portability by default
-- Inspectable, editable, exportable artifacts
-- Mobile-first usability and cost-aware infrastructure
+An authenticated project editor can inspect the configured provider/model, explicitly consent to external processing, and request a first-draft PRD. The server checks membership and role before provider invocation, validates the generated output, rechecks access before persistence, and appends the immutable artifact and activity event in one database transaction. Provider failure or invalid output does not create an artifact.
 
-## Current status
+Generated PRDs are drafts and require human review. Provider credentials remain server-side. Automatic provider failover is disabled.
 
-The repository contains a responsive Next.js foundation and an initial Project Engine domain/schema. The Project Engine migration is not yet applied to a live database. The transaction-scoped PostgreSQL adapter is implemented and covered by CI tests for pooled identity isolation. Authentication/session verification and a separate least-privilege runtime login are still not connected. Project API routes, AI, build sandbox, GitHub automation, and deployment orchestration remain unimplemented.
+## Verification and deployment status
+
+CI validates deterministic provider adapters, route authorization/consent behavior, schema and artifact limits, transaction behavior, and PostgreSQL RLS/least-privilege boundaries. These tests do **not** prove that a live deployment has valid GitHub OAuth credentials, a provisioned database, working provider credentials, or successful external API connectivity.
+
+Live OAuth and provider smoke tests remain outstanding and must be run in a non-production environment with synthetic project data. The repository does not itself provide hosted infrastructure or production credentials.
 
 ## Local development
 
-Requirements: Node.js 20+, npm.
+Requirements: Node.js 20+, npm, and PostgreSQL for database-backed workflows.
 
 ```bash
 npm install
 npm run dev
 ```
 
-Open http://localhost:3000.
+Copy `.env.example` to `.env.local` and configure the required server-side values. See:
 
-## Project Engine schema
+- [Authentication](docs/AUTHENTICATION.md)
+- [Database operations and migrations](docs/DATABASE_OPERATIONS.md)
+- [AI gateway and provider configuration](docs/AI_GATEWAY.md)
+- [PRD generation verification runbook](docs/PRD_GENERATION_VERIFICATION.md)
+- [Engineering roadmap](docs/ENGINEERING_ROADMAP.md)
 
-Review [the data model and security contract](docs/PROJECT_ENGINE_DATA_MODEL.md). The initial PostgreSQL migration is at `database/migrations/0001_project_engine.sql`.
-
-Do not expose project APIs until a verified authentication session, transaction-scoped workspace authorization, and a non-BYPASSRLS runtime database role are configured.
+Never commit credentials or expose them through `NEXT_PUBLIC_*` variables. Use a restricted runtime database login for `DATABASE_URL`; reserve `MIGRATION_DATABASE_URL` for controlled migration execution.

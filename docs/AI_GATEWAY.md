@@ -2,7 +2,7 @@
 
 ## Supported providers
 
-The server-side gateway supports native API adapters for OpenAI, Anthropic Claude, and Google Gemini, plus a generic OpenAI-compatible endpoint for compatible services.
+The server-side gateway supports native API adapters for OpenAI, Anthropic Claude, and Google Gemini, plus a generic OpenAI-compatible endpoint.
 
 Configure one provider per request process using `AI_PROVIDER`:
 
@@ -11,32 +11,32 @@ Configure one provider per request process using `AI_PROVIDER`:
 - `gemini`: `GEMINI_API_KEY`, `GEMINI_MODEL`, optional `GEMINI_BASE_URL`.
 - `openai-compatible`: `AI_API_KEY`, `AI_MODEL`, optional `AI_BASE_URL`.
 
-For any provider, `AI_MODEL` can supply a shared model fallback. Provider-specific keys and model values take precedence. Do not configure multiple keys in a client environment or expose them through `NEXT_PUBLIC_*`.
+`AI_MODEL` can supply a shared model fallback. Provider-specific keys and model values take precedence. Never expose provider credentials through `NEXT_PUBLIC_*` variables.
 
-Defaults:
-- OpenAI: `https://api.openai.com/v1`
-- Anthropic: `https://api.anthropic.com`
-- Gemini: `https://generativelanguage.googleapis.com/v1beta`
-- OpenAI-compatible: `https://api.openai.com/v1`
-
-Non-local endpoints must use HTTPS. The selected model identifier is explicit configuration; model availability and structured-output support vary by provider/model.
-
-## Provider-specific transport
+## Transport and safeguards
 
 - OpenAI-compatible endpoints use Bearer authentication and Chat Completions JSON mode.
-- Anthropic uses the Messages API, `x-api-key`, and `anthropic-version`; the model is instructed to return JSON.
-- Gemini uses `generateContent`, `x-goog-api-key`, and `responseMimeType: application/json`.
+- Anthropic uses the Messages API and its provider-specific authentication/version headers.
+- Gemini uses `generateContent` with JSON response mode.
+- Non-local endpoints must use HTTPS.
+- Requests have a 30-second timeout and bounded response parsing.
+- Provider HTTP errors, malformed responses, empty output, invalid JSON, schema violations, and missing credentials fail closed.
+- No automatic provider failover or fabricated fallback output is enabled.
 
-Each adapter normalizes provider response content to text. The shared PRD validator remains authoritative; provider-native structured output does not replace application validation.
+The shared PRD validator is authoritative even when a provider offers structured-output features.
 
-## Fail-closed behavior
+## Data handling and consent
 
-Each request has a 30-second timeout. HTTP errors, malformed provider responses, empty output, invalid JSON, schema violations, and missing credentials fail the generation. There is no implicit provider fallback or fabricated response. Provider selection is explicit; automatic failover is intentionally not enabled because it could move project data to a different external processor without user consent.
+The authenticated `POST /api/projects/{projectId}/generate-prd` route requires explicit `{ "consent": true }`. Before provider invocation, it verifies the Auth.js session, project membership, and an owner/admin/member role. It loads the project name, description, target, and brief from the database; client-supplied identity, role, or project brief is not accepted.
 
-## Data handling and limitations
+The selected external provider receives that project content to generate the PRD. The configured provider/model is disclosed through the authenticated GET route before consent. Access is checked again after the network call; revoked or downgraded access prevents persistence. A validated result is appended as an immutable PRD artifact with an activity event in the same database transaction.
 
-Sending a project brief to a provider transmits that content to the configured external service. A future authenticated route must authorize project membership and editor role before provider invocation, disclose the selected provider, and append only validated output. This gateway does not yet add a user-facing generation endpoint or automatic artifact write.
+The generated PRD is an unverified first draft and must be reviewed. Do not send sensitive or production data during smoke tests; use synthetic project content.
 
 ## Verification
 
-`npm run test:ai-gateway` tests shared PRD validation, provider selection/configuration, native request headers and payload shapes, malformed output, and provider failure propagation using deterministic local fixtures. It does not make live paid API calls.
+- `npm run test:ai-gateway` exercises provider selection/configuration, request headers and payloads, malformed output, and provider failure using local fixtures.
+- `npm run test:prd-generation-route` exercises HTTP consent, authorization, provider failure, validation, and persistence boundaries with deterministic fixtures.
+- PostgreSQL CI exercises RLS and least-privilege database boundaries.
+
+These tests do not make live paid provider requests and do not prove deployed OAuth/provider connectivity. Follow [PRD_GENERATION_VERIFICATION.md](PRD_GENERATION_VERIFICATION.md) for the manual staging smoke test.
