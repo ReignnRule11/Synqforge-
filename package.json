@@ -22,7 +22,7 @@
     "test:prd-generation-route": "tsx scripts/test-prd-generation-route.ts",
     "test:e2e": "playwright test",
     "test:unit": "npm run test:auth-identity && npm run test:auth-session-identity && npm run test:authenticated-db-boundary && npm run test:current-user-transaction && npm run test:workspace-domain && npm run test:project-domain && npm run test:project-artifacts && npm run test:ai-gateway && npm run test:prd-generation-route && npm run test:artifact-route",
-    "test:coverage": "c8 npm run test:unit",
+    "test:coverage": "c8 npm run test:unit && c8 check-coverage --lines 95 --statements 95 --functions 95 --branches 80 && c8 check-coverage --per-file --lines 95 --statements 95 --functions 90 --branches 65",
     "test:artifact-route": "tsx scripts/test-artifact-route.ts"
   },
   "dependencies": {
