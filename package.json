@@ -18,7 +18,8 @@
     "test:project-domain": "tsx scripts/test-project-domain.ts",
     "test:project-artifacts": "tsx scripts/test-project-artifacts.ts",
     "test:ai-gateway": "NODE_OPTIONS=--conditions=react-server tsx scripts/test-ai-gateway.ts",
-    "test:prd-generation-route": "tsx scripts/test-prd-generation-route.ts"
+    "test:prd-generation-route": "tsx scripts/test-prd-generation-route.ts",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",
@@ -30,6 +31,7 @@
     "server-only": "^0.0.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.1",
     "@types/node": "^22.13.4",
     "@types/react": "^19.0.8",
     "@types/react-dom": "^19.0.3",
