@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { withCurrentUserTransaction } from "@/lib/auth/authenticated-db";
+import { hashArtifactRequest, validateIdempotencyKey } from "@/lib/projects/artifact-idempotency";
 import { PROJECT_ARTIFACT_TYPES, validateProjectArtifactInput } from "@/lib/projects/artifacts";
 
 export const runtime = "nodejs";
@@ -52,12 +53,22 @@ export async function GET(request: Request, { params }: RouteContext) {
   }
 }
 
-/** Append a new immutable version. The advisory lock serializes version allocation per type/project. */
+/**
+ * Append one immutable version. Idempotency is scoped to the authenticated workspace,
+ * project, operation, and caller key; the record, artifact, and activity event commit atomically.
+ */
 export async function POST(request: Request, { params }: RouteContext) {
   const { projectId } = await params;
   if (!UUID_PATTERN.test(projectId)) return errorResponse("A valid project ID is required.", 422);
   if (!request.headers.get("content-type")?.toLowerCase().startsWith("application/json")) {
     return errorResponse("Content-Type must be application/json.", 415);
+  }
+
+  let idempotencyKey: string;
+  try {
+    idempotencyKey = validateIdempotencyKey(request.headers.get("Idempotency-Key"));
+  } catch (error) {
+    return errorResponse(error instanceof Error ? error.message : "A valid Idempotency-Key is required.", 400);
   }
 
   let body: unknown;
@@ -74,15 +85,46 @@ export async function POST(request: Request, { params }: RouteContext) {
     return errorResponse(error instanceof Error ? error.message : "Artifact details are invalid.", 422);
   }
 
+  const requestHash = hashArtifactRequest(input);
+
   try {
-    const artifact = await withCurrentUserTransaction(async (client) => {
+    const result = await withCurrentUserTransaction(async (client) => {
       const projectResult = await client.query(
         "SELECT workspace_id FROM projects WHERE id = $1",
         [projectId],
       );
       const project = projectResult.rows[0] as { workspace_id: string } | undefined;
-      if (!project) return null;
+      if (!project) return { kind: "not_found" as const };
 
+      // Serialize retries of the same key without blocking different keys or artifact types.
+      const lockScope = `${project.workspace_id}:${projectId}:artifact.create:${idempotencyKey}`;
+      await client.query(
+        "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+        [lockScope],
+      );
+
+      const previous = await client.query(
+        `SELECT request_hash, artifact_id
+         FROM project_artifact_idempotency
+         WHERE workspace_id = $1 AND project_id = $2
+           AND operation = 'artifact.create' AND idempotency_key = $3`,
+        [project.workspace_id, projectId, idempotencyKey],
+      );
+      if (previous.rows[0]) {
+        if (previous.rows[0].request_hash.trim() !== requestHash) {
+          return { kind: "key_conflict" as const };
+        }
+        const original = await client.query(
+          `SELECT id, workspace_id, project_id, artifact_type, title, version,
+                  content, created_by, created_at
+           FROM project_artifacts WHERE id = $1 AND project_id = $2`,
+          [previous.rows[0].artifact_id, projectId],
+        );
+        if (!original.rows[0]) throw new Error("Idempotency record references a missing artifact.");
+        return { kind: "replay" as const, artifact: original.rows[0] };
+      }
+
+      // Keep version allocation serialized independently from idempotency-key locking.
       await client.query(
         "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
         [`${projectId}:${input.artifactType}`],
@@ -110,10 +152,23 @@ export async function POST(request: Request, { params }: RouteContext) {
           JSON.stringify({ artifact_type: input.artifactType, version, artifact_id: inserted.rows[0].id }),
         ],
       );
-      return inserted.rows[0];
+      await client.query(
+        `INSERT INTO project_artifact_idempotency
+           (workspace_id, project_id, operation, idempotency_key, request_hash, artifact_id)
+         VALUES ($1, $2, 'artifact.create', $3, $4, $5)`,
+        [project.workspace_id, projectId, idempotencyKey, requestHash, inserted.rows[0].id],
+      );
+      return { kind: "created" as const, artifact: inserted.rows[0] };
     });
-    if (!artifact) return errorResponse("Project not found.", 404);
-    return NextResponse.json({ artifact }, { status: 201 });
+
+    if (result.kind === "not_found") return errorResponse("Project not found.", 404);
+    if (result.kind === "key_conflict") {
+      return errorResponse("Idempotency-Key was already used with a different artifact payload.", 409);
+    }
+    if (result.kind === "replay") {
+      return NextResponse.json({ artifact: result.artifact, idempotent_replay: true }, { status: 200 });
+    }
+    return NextResponse.json({ artifact: result.artifact, idempotent_replay: false }, { status: 201 });
   } catch (error) {
     const status = statusFor(error);
     if (status === 401) return errorResponse("Authentication required.", 401);
