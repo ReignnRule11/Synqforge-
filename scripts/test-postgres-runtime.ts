@@ -300,6 +300,53 @@ async function run() {
     "each committed artifact version must have exactly one corresponding activity event",
   );
 
+  // Idempotency records are workspace-scoped, editor-writable, and unique per operation/key.
+  const idempotencyArtifactId = concurrentResults[0].id;
+  await withAuthenticatedUserTransaction(runtime, userA, async (client) => {
+    await client.query(
+      `INSERT INTO project_artifact_idempotency
+         (workspace_id, project_id, operation, idempotency_key, request_hash, artifact_id)
+       VALUES ($1, $2, 'artifact.create', $3, $4, $5)`,
+      [workspaceA, ownerProject.id, "runtime-artifact-key-001", "a".repeat(64), idempotencyArtifactId],
+    );
+  });
+  const visibleIdempotency = await withAuthenticatedUserTransaction(runtime, userA, async (client) => {
+    const result = await client.query(
+      "SELECT artifact_id FROM project_artifact_idempotency WHERE project_id = $1 AND idempotency_key = $2",
+      [ownerProject.id, "runtime-artifact-key-001"],
+    );
+    return result.rows;
+  });
+  assert.deepEqual(visibleIdempotency, [{ artifact_id: idempotencyArtifactId }]);
+  await assert.rejects(
+    withAuthenticatedUserTransaction(runtime, userA, async (client) =>
+      client.query(
+        `INSERT INTO project_artifact_idempotency
+           (workspace_id, project_id, operation, idempotency_key, request_hash, artifact_id)
+         VALUES ($1, $2, 'artifact.create', $3, $4, $5)`,
+        [workspaceA, ownerProject.id, "runtime-artifact-key-001", "b".repeat(64), idempotencyArtifactId],
+      ),
+    ),
+    { code: "23505" },
+    "a workspace/project/operation idempotency key cannot be claimed twice",
+  );
+  const tenantBIdempotency = await withAuthenticatedUserTransaction(runtime, userB, async (client) =>
+    client.query("SELECT id FROM project_artifact_idempotency WHERE project_id = $1", [ownerProject.id]),
+  );
+  assert.equal(tenantBIdempotency.rows.length, 0, "idempotency records must remain tenant-isolated");
+  await assert.rejects(
+    withAuthenticatedUserTransaction(runtime, viewerUser, async (client) =>
+      client.query(
+        `INSERT INTO project_artifact_idempotency
+           (workspace_id, project_id, operation, idempotency_key, request_hash, artifact_id)
+         VALUES ($1, $2, 'artifact.create', $3, $4, $5)`,
+        [workspaceA, ownerProject.id, "viewer-key-0001", "c".repeat(64), idempotencyArtifactId],
+      ),
+    ),
+    { code: "42501" },
+    "viewers cannot create artifact idempotency records",
+  );
+
   const memberArtifact = await withAuthenticatedUserTransaction(runtime, memberUser, async (client) => {
     const result = await client.query(
       `INSERT INTO project_artifacts (workspace_id, project_id, artifact_type, title, version, content, created_by)
