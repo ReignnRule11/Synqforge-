@@ -56,7 +56,8 @@
 - [x] AI provider resilience tests cover network rejection, HTTP errors, malformed response JSON, abort timeouts, and secret-safe transport errors
 - [x] PostgreSQL artifact integrity tests cover failed-write rollback, concurrent version allocation across separate pooled connections, and one-to-one artifact/activity event consistency
 - [x] Artifact creation uses workspace/project-scoped idempotency keys, canonical payload hashes, atomic persistence, and replay/conflict semantics
-- [ ] Extend live PostgreSQL integration coverage to Auth.js session-to-runtime adapter wiring and production-like deployed authentication
+- [x] Live PostgreSQL integration covers verified-session-to-runtime adapter composition, transaction-local identity, and RLS enforcement using a deterministic session fixture
+- [ ] Production-like deployed GitHub OAuth and authenticated browser verification with dedicated test identities
 
 ## Phase 6 — GitHub and Deploy
 - [ ] Revocable GitHub repository integration with minimum scopes
