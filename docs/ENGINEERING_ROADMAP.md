@@ -43,7 +43,8 @@
 - [x] Deterministic regression coverage for authentication, workspace/project domains, artifacts, AI gateway, and PRD route boundaries
 - [x] Extended regression cases for workspace Unicode/slug boundaries, lifecycle graph integrity, immutable transitions, and artifact UTF-8/serialization limits
 - [x] CodeQL static analysis and high-severity npm dependency audit
-- [ ] Browser E2E against deployed application with live Auth.js and PostgreSQL
+- [x] Deployment-triggered Chromium smoke checks for sign-in reachability and unauthenticated workspace API rejection
+- [ ] Authenticated cross-tenant browser verification using two dedicated test identities and a live project
 - [x] CI secret scanning via Gitleaks on pull requests, main pushes, and a weekly schedule
 - [ ] Enable and verify GitHub native secret-scanning alerts and push protection
 - [x] Dependency Review workflow verified successfully on PR #32
