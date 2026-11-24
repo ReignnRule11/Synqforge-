@@ -125,7 +125,7 @@ export function createPrdGenerationHandlers(deps: PrdGenerationDependencies) {
         return errorResponse("The configured AI provider could not produce a valid PRD within artifact limits. No artifact was saved.", 502);
       }
 
-      // Re-check current membership and lock the project row after the network call. A revoked or
+      // Re-check and lock the membership row after the network call. A revoked or
       // downgraded membership cannot persist output generated under stale access.
       const artifact = await deps.withCurrentUserTransaction(async (client) => {
         const access = await client.query(
@@ -135,7 +135,7 @@ export function createPrdGenerationHandlers(deps: PrdGenerationDependencies) {
              ON m.workspace_id = p.workspace_id
             AND m.user_id = current_setting('app.user_id')::uuid
            WHERE p.id = $1
-           FOR UPDATE OF p`,
+           FOR UPDATE OF p, m`,
           [projectId],
         );
         const current = access.rows[0] as { workspace_id: string; role: string } | undefined;
