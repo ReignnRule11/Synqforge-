@@ -5,11 +5,23 @@ Project artifacts are immutable, versioned documents attached to a project and w
 ## Endpoints
 
 - `GET /api/projects/:projectId/artifacts` — list artifact versions visible to an authenticated workspace member. Optional `artifact_type` filters history.
-- `POST /api/projects/:projectId/artifacts` — append a version. Requires JSON with `artifact_type`, `title`, and object-valued `content`.
+- `POST /api/projects/:projectId/artifacts` — append a version. Requires JSON with `artifact_type`, `title`, and object-valued `content`, plus an `Idempotency-Key` request header.
 - `GET /api/projects/:projectId/generate-prd` — disclose configured provider/model to an authenticated project member before consent.
 - `POST /api/projects/:projectId/generate-prd` — generate and persist a PRD after explicit consent and editor authorization.
 
 Supported artifact types: `product_brief`, `prd`, `user_stories`, `roadmap`, `design_spec`, `architecture`, `api_contract`, `database_schema`, `source_code`, and `test_report`.
+
+## Idempotency contract
+
+- Every artifact-create POST must provide `Idempotency-Key` with 8–128 ASCII letters, digits, dots, underscores, colons, or hyphens.
+- The key is scoped to the authenticated workspace, project, and `artifact.create` operation. A key used for another workspace or project does not collide.
+- The server hashes a canonical representation of artifact type, normalized title, and content. Object key order does not change the hash.
+- First successful use creates the immutable artifact, activity event, and idempotency record in one PostgreSQL transaction; the response is `201` with `idempotent_replay: false`.
+- A retry with the same key and same payload returns the original artifact with `200` and `idempotent_replay: true`. It does not allocate another version or append another activity event.
+- Reusing a key with a different payload returns `409`. The original record remains unchanged.
+- A failed transaction persists neither the artifact nor its activity/idempotency records, so the same key can safely be retried.
+- A transaction-scoped advisory lock serializes requests using the same scoped key. A separate project/type lock continues to serialize version allocation.
+- The dashboard retains the key after a failed request and clears it only after a successful response, so a user retry reuses the same key.
 
 ## Versioning and authorization
 

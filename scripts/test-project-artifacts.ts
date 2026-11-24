@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { PROJECT_ARTIFACT_TYPES, validateProjectArtifactInput } from "../src/lib/projects/artifacts";
+import { hashArtifactRequest, validateIdempotencyKey } from "../src/lib/projects/artifact-idempotency";
 
 const valid = validateProjectArtifactInput({
   artifact_type: "prd",
@@ -37,4 +38,26 @@ assert.throws(
   /valid JSON/,
 );
 
-console.log("PASS: artifact type, title, JSON shape, UTF-8 byte limit, and serialization-failure validation.");
+const canonicalInputA = validateProjectArtifactInput({
+  artifact_type: "prd",
+  title: "Canonical PRD",
+  content: { z: 1, nested: { b: true, a: "same" }, a: [1, 2] },
+});
+const canonicalInputB = validateProjectArtifactInput({
+  content: { a: [1, 2], nested: { a: "same", b: true }, z: 1 },
+  title: "Canonical PRD",
+  artifact_type: "prd",
+});
+assert.equal(hashArtifactRequest(canonicalInputA), hashArtifactRequest(canonicalInputB),
+  "object property order must not change the idempotency request hash");
+assert.notEqual(
+  hashArtifactRequest(canonicalInputA),
+  hashArtifactRequest({ ...canonicalInputA, content: { ...canonicalInputA.content, z: 2 } }),
+  "a changed payload must produce a different request hash",
+);
+assert.equal(validateIdempotencyKey("request-1234"), "request-1234");
+for (const invalidKey of [null, "", "short", "bad key value", "x".repeat(129)]) {
+  assert.throws(() => validateIdempotencyKey(invalidKey), /Idempotency-Key/);
+}
+
+console.log("PASS: artifact validation, UTF-8 limits, canonical request hashing, and idempotency-key validation.");
