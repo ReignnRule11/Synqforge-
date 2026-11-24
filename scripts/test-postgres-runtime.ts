@@ -9,6 +9,7 @@ if (!runtimeUrl) throw new Error("DATABASE_URL must use the dedicated runtime lo
 
 const admin = new Pool({ connectionString: adminUrl, max: 1 });
 const runtime = new Pool({ connectionString: runtimeUrl, max: 1 });
+const concurrentRuntime = new Pool({ connectionString: runtimeUrl, max: 2 });
 
 const userA = "20000000-0000-4000-8000-000000000001";
 const userB = "20000000-0000-4000-8000-000000000005";
@@ -250,7 +251,7 @@ async function run() {
   // Two concurrent writers serialize version allocation using the same transaction-scoped advisory lock.
   const concurrentArtifactType = "test_report";
   const appendConcurrentArtifact = (title: string) =>
-    withAuthenticatedUserTransaction(runtime, userA, async (client) => {
+    withAuthenticatedUserTransaction(concurrentRuntime, userA, async (client) => {
       await client.query(
         "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
         [`${ownerProject.id}:${concurrentArtifactType}`],
@@ -440,5 +441,6 @@ run()
   })
   .finally(async () => {
     await runtime.end();
+    await concurrentRuntime.end();
     await admin.end();
   });
