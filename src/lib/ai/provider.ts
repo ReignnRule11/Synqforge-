@@ -66,23 +66,32 @@ async function postJson(
   endpoint: string,
   headers: Record<string, string>,
   body: unknown,
+  timeoutMs = 30_000,
 ): Promise<unknown> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 30_000);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const response = await fetcher(endpoint, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", ...headers },
-      body: JSON.stringify(body),
-      signal: controller.signal,
-    });
-    if (!response.ok) throw new Error(`AI provider request failed with HTTP ${response.status}.`);
-    return await response.json();
-  } catch (error) {
-    if (error instanceof Error && error.name === "AbortError") {
-      throw new Error("AI provider timed out after 30 seconds.");
+    let response: Response;
+    try {
+      response = await fetcher(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...headers },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+    } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") {
+        throw new Error("AI provider request timed out.");
+      }
+      // Do not propagate fetch implementation errors: they can contain request URLs or credentials.
+      throw new Error("AI provider network request failed.");
     }
-    throw error;
+    if (!response.ok) throw new Error(`AI provider request failed with HTTP ${response.status}.`);
+    try {
+      return await response.json();
+    } catch {
+      throw new Error("AI provider returned malformed JSON.");
+    }
   } finally {
     clearTimeout(timeout);
   }
@@ -106,6 +115,7 @@ export class OpenAICompatibleProvider implements TextGenerationProvider {
   constructor(
     private readonly config: ProviderConfig,
     private readonly requestFetch: typeof fetch = fetch,
+    private readonly requestTimeoutMs = 30_000,
   ) {}
 
   async generate(request: TextGenerationRequest): Promise<string> {
@@ -116,7 +126,7 @@ export class OpenAICompatibleProvider implements TextGenerationProvider {
         max_tokens: request.maxOutputTokens,
         response_format: { type: "json_object" },
         messages: [{ role: "system", content: request.system }, { role: "user", content: request.prompt }],
-      }));
+      }, this.requestTimeoutMs));
     const choices = payload.choices;
     if (!Array.isArray(choices) || !choices[0]) throw new Error("OpenAI-compatible response contained no completion.");
     const message = objectValue((choices[0] as Record<string, unknown>).message);
@@ -128,6 +138,7 @@ export class AnthropicProvider implements TextGenerationProvider {
   constructor(
     private readonly config: ProviderConfig,
     private readonly requestFetch: typeof fetch = fetch,
+    private readonly requestTimeoutMs = 30_000,
   ) {}
 
   async generate(request: TextGenerationRequest): Promise<string> {
@@ -139,7 +150,7 @@ export class AnthropicProvider implements TextGenerationProvider {
       max_tokens: request.maxOutputTokens,
       system: `${request.system} Return only a valid JSON object, with no markdown fences.`,
       messages: [{ role: "user", content: request.prompt }],
-    }));
+    }, this.requestTimeoutMs));
     if (!Array.isArray(payload.content)) throw new Error("Anthropic response contained no content blocks.");
     const text = payload.content
       .filter((block): block is Record<string, unknown> => !!block && typeof block === "object" && !Array.isArray(block))
@@ -153,6 +164,7 @@ export class GeminiProvider implements TextGenerationProvider {
   constructor(
     private readonly config: ProviderConfig,
     private readonly requestFetch: typeof fetch = fetch,
+    private readonly requestTimeoutMs = 30_000,
   ) {}
 
   async generate(request: TextGenerationRequest): Promise<string> {
@@ -166,7 +178,7 @@ export class GeminiProvider implements TextGenerationProvider {
         maxOutputTokens: request.maxOutputTokens,
         responseMimeType: "application/json",
       },
-    }));
+    }, this.requestTimeoutMs));
     const candidates = payload.candidates;
     if (!Array.isArray(candidates) || !candidates[0]) throw new Error("Gemini response contained no candidate.");
     const candidate = objectValue(candidates[0]);
