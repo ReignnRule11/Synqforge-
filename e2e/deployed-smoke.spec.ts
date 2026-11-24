@@ -4,6 +4,7 @@ test("deployed sign-in page is reachable", async ({ page }) => {
   const response = await page.goto("/signin");
   expect(response, "sign-in navigation should return an HTTP response").not.toBeNull();
   expect(response!.status()).toBe(200);
+  expect(new URL(page.url()).origin).toBe(new URL(process.env.E2E_BASE_URL ?? "http://127.0.0.1:3000").origin);
   await expect(page.locator("body")).not.toBeEmpty();
 });
 
@@ -29,8 +30,14 @@ test("a second authenticated user cannot read the first user's project", async (
 
   const stateA = JSON.parse(userAState!);
   const stateB = JSON.parse(userBState!);
-  const userA = await browser.newContext({ storageState: stateA });
-  const userB = await browser.newContext({ storageState: stateB });
+  const bypassHeaders = process.env.VERCEL_AUTOMATION_BYPASS_SECRET
+    ? {
+        "x-vercel-protection-bypass": process.env.VERCEL_AUTOMATION_BYPASS_SECRET,
+        "x-vercel-set-bypass-cookie": "true",
+      }
+    : {};
+  const userA = await browser.newContext({ storageState: stateA, extraHTTPHeaders: bypassHeaders });
+  const userB = await browser.newContext({ storageState: stateB, extraHTTPHeaders: bypassHeaders });
 
   try {
     const ownerResponse = await userA.request.get(
