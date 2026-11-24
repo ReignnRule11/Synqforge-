@@ -21,6 +21,7 @@ const userAState = process.env.E2E_USER_A_STORAGE_STATE;
 const userBState = process.env.E2E_USER_B_STORAGE_STATE;
 const projectId = process.env.E2E_USER_A_PROJECT_ID;
 const baseURL = process.env.E2E_BASE_URL ?? "http://127.0.0.1:3000";
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 test("a second authenticated user cannot read the first user's project", async ({ browser }) => {
   test.skip(
@@ -39,6 +40,24 @@ test("a second authenticated user cannot read the first user's project", async (
   const userB = await browser.newContext({ storageState: stateB, extraHTTPHeaders: bypassHeaders });
 
   try {
+    // Prove both stored sessions resolve to distinct, verified Auth.js identities.
+    const sessionAResponse = await userA.request.get(new URL("/api/auth/session", baseURL).toString());
+    const sessionBResponse = await userB.request.get(new URL("/api/auth/session", baseURL).toString());
+    expect(sessionAResponse.status()).toBe(200);
+    expect(sessionBResponse.status()).toBe(200);
+
+    const sessionA = await sessionAResponse.json() as { user?: { id?: string } };
+    const sessionB = await sessionBResponse.json() as { user?: { id?: string } };
+    expect(sessionA.user?.id, "test user A must have an authenticated session identity").toMatch(UUID_PATTERN);
+    expect(sessionB.user?.id, "test user B must have an authenticated session identity").toMatch(UUID_PATTERN);
+    expect(sessionA.user!.id).not.toBe(sessionB.user!.id);
+
+    // Both identities must independently pass an authenticated application API.
+    const workspacesA = await userA.request.get(new URL("/api/workspaces", baseURL).toString());
+    const workspacesB = await userB.request.get(new URL("/api/workspaces", baseURL).toString());
+    expect(workspacesA.status()).toBe(200);
+    expect(workspacesB.status()).toBe(200);
+
     const ownerResponse = await userA.request.get(
       new URL(`/api/projects/${encodeURIComponent(projectId!)}`, baseURL).toString(),
     );
