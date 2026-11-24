@@ -39,8 +39,14 @@
 - [ ] Build logs, reproducible outputs, and reviewed diffs
 
 ## Phase 5 — Quality and Security
-- [ ] Browser E2E, static analysis, dependency and secret scanning
+- [x] Strict TypeScript, ESLint, and production-build gates in CI
+- [x] Deterministic regression coverage for authentication, workspace/project domains, artifacts, AI gateway, and PRD route boundaries
+- [x] Extended regression cases for workspace Unicode/slug boundaries, lifecycle graph integrity, immutable transitions, and artifact UTF-8/serialization limits
+- [x] CodeQL static analysis and high-severity npm dependency audit
+- [ ] Browser E2E against deployed application with live Auth.js and PostgreSQL
+- [ ] Secret scanning and verified dependency-review support
 - [ ] Bounded repair iterations with explicit diffs and approval gates
+- [ ] Coverage instrumentation and enforced thresholds after adopting a compatible coverage runner
 
 ## Phase 6 — GitHub and Deploy
 - [ ] Revocable GitHub repository integration with minimum scopes
