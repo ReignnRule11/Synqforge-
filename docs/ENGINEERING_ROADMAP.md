@@ -44,7 +44,9 @@
 - [x] Extended regression cases for workspace Unicode/slug boundaries, lifecycle graph integrity, immutable transitions, and artifact UTF-8/serialization limits
 - [x] CodeQL static analysis and high-severity npm dependency audit
 - [ ] Browser E2E against deployed application with live Auth.js and PostgreSQL
-- [ ] Secret scanning and verified dependency-review support
+- [x] CI secret scanning via Gitleaks on pull requests, main pushes, and a weekly schedule
+- [ ] Enable and verify GitHub native secret-scanning alerts and push protection
+- [ ] Enable the repository dependency graph and verify Dependency Review on a pull request
 - [ ] Bounded repair iterations with explicit diffs and approval gates
 - [ ] Coverage instrumentation and enforced thresholds after adopting a compatible coverage runner
 
