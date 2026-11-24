@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { Pool } from "pg";
 import { withAuthenticatedUserTransaction } from "../src/lib/db/runtime";
 import { createCurrentUserTransaction } from "../src/lib/auth/current-user-transaction";
+import { githubUserIdToUuid } from "../src/lib/auth/identity";
 
 const adminUrl = process.env.ADMIN_DATABASE_URL;
 const runtimeUrl = process.env.DATABASE_URL;
@@ -12,7 +13,7 @@ const admin = new Pool({ connectionString: adminUrl, max: 1 });
 const runtime = new Pool({ connectionString: runtimeUrl, max: 1 });
 const concurrentRuntime = new Pool({ connectionString: runtimeUrl, max: 2 });
 
-const userA = "20000000-0000-4000-8000-000000000001";
+const userA = githubUserIdToUuid("222224725");
 const userB = "20000000-0000-4000-8000-000000000005";
 const adminUser = "20000000-0000-4000-8000-000000000002";
 const memberUser = "20000000-0000-4000-8000-000000000003";
