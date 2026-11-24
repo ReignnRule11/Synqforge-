@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { Pool } from "pg";
 import { withAuthenticatedUserTransaction } from "../src/lib/db/runtime";
+import { createCurrentUserTransaction } from "../src/lib/auth/current-user-transaction";
 
 const adminUrl = process.env.ADMIN_DATABASE_URL;
 const runtimeUrl = process.env.DATABASE_URL;
@@ -49,6 +50,47 @@ async function run() {
       ($1, $2, 'owner'), ($1, $3, 'admin'), ($1, $4, 'member'), ($1, $5, 'viewer'), ($6, $7, 'owner')`,
     [workspaceA, userA, adminUser, memberUser, viewerUser, workspaceB, userB],
   );
+
+  // Exercise the same session -> current-user transaction composition used by
+  // src/lib/auth/authenticated-db.ts, with a deterministic verified-session fixture
+  // and a real restricted PostgreSQL runtime pool.
+  const withCurrentUserTransaction = createCurrentUserTransaction(
+    async () => ({ user: { id: userA } }),
+    () => runtime,
+    withAuthenticatedUserTransaction,
+  );
+  const sessionBoundContext = await withCurrentUserTransaction(async (client) => {
+    const result = await client.query(
+      `SELECT current_user, current_setting('app.user_id', true) AS app_user_id,
+              (SELECT count(*)::int FROM workspaces) AS visible_workspace_count`,
+    );
+    return result.rows[0] as {
+      current_user: string;
+      app_user_id: string;
+      visible_workspace_count: number;
+    };
+  });
+  assert.equal(sessionBoundContext.current_user, "synqforge_app");
+  assert.equal(sessionBoundContext.app_user_id, userA,
+    "verified session identity must become the transaction-local PostgreSQL identity");
+  assert.equal(sessionBoundContext.visible_workspace_count, 1,
+    "session-derived identity must be enforced by PostgreSQL RLS");
+
+  let deniedSessionWorkRan = false;
+  const withInvalidSession = createCurrentUserTransaction(
+    async () => ({ user: { id: "not-a-verified-uuid" } }),
+    () => runtime,
+    withAuthenticatedUserTransaction,
+  );
+  await assert.rejects(
+    withInvalidSession(async () => {
+      deniedSessionWorkRan = true;
+      return "must-not-run";
+    }),
+    /verified session UUID/,
+  );
+  assert.equal(deniedSessionWorkRan, false,
+    "invalid session identity must be rejected before PostgreSQL work begins");
 
   const visibleToA = await withAuthenticatedUserTransaction(runtime, userA, async (client) => {
     const result = await client.query(
