@@ -20,6 +20,9 @@ function setup(options: { missingProject?: boolean; failActivityOnce?: boolean }
 
   const client = {
     async query(sql: string, values: unknown[] = []) {
+      if (sql.includes("SELECT id FROM projects")) {
+        return { rows: options.missingProject ? [] : [{ id: projectId }] };
+      }
       if (sql.includes("SELECT workspace_id FROM projects")) {
         return { rows: options.missingProject ? [] : [{ workspace_id: workspaceId }] };
       }
