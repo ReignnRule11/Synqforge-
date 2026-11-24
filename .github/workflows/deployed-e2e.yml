@@ -1,0 +1,36 @@
+name: Deployed browser E2E
+
+on:
+  deployment_status:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deployed-e2e-${{ github.event.deployment_status.target_url || vars.E2E_BASE_URL || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  browser-smoke:
+    if: github.event_name == 'workflow_dispatch' || github.event.deployment_status.state == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install dependencies
+        run: npm install
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run deployed browser checks
+        run: npm run test:e2e
+        env:
+          CI: "true"
+          E2E_BASE_URL: ${{ github.event.deployment_status.target_url || vars.E2E_BASE_URL }}
+          E2E_USER_A_STORAGE_STATE: ${{ secrets.E2E_USER_A_STORAGE_STATE }}
+          E2E_USER_B_STORAGE_STATE: ${{ secrets.E2E_USER_B_STORAGE_STATE }}
+          E2E_USER_A_PROJECT_ID: ${{ vars.E2E_USER_A_PROJECT_ID }}
