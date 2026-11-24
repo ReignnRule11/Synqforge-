@@ -51,7 +51,7 @@
 - [x] Dependency Review workflow verified successfully on PR #32
 - [x] V8 coverage instrumentation with text/LCOV reports for AI, auth, project, and workspace domain modules; CI publishes a seven-day report artifact
 - [x] Current-user transaction orchestration extracted behind a dependency seam and tested for verified identity, invalid sessions, auth failure, and database failure
-- [ ] Establish and enforce defensible global/per-file coverage thresholds from repeated CI baselines
+- [x] Establish and enforce global/per-file coverage thresholds from repeated CI baselines (95% global lines/statements/functions, 80% global branches; per-file floors 95% lines/statements, 90% functions, 65% branches)
 - [x] Live PostgreSQL runtime tests verify transaction-local role/identity, rollback behavior, and pooled-connection identity reset across tenant reuse
 - [x] AI provider resilience tests cover network rejection, HTTP errors, malformed response JSON, abort timeouts, and secret-safe transport errors
 - [x] PostgreSQL artifact integrity tests cover failed-write rollback, concurrent version allocation across separate pooled connections, and one-to-one artifact/activity event consistency
