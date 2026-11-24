@@ -14,13 +14,14 @@
     "test:auth-identity": "tsx scripts/test-auth-identity.ts",
     "test:auth-session-identity": "tsx scripts/test-auth-session-identity.ts",
     "test:authenticated-db-boundary": "tsx scripts/test-authenticated-db-boundary.ts",
+    "test:current-user-transaction": "tsx scripts/test-current-user-transaction.ts",
     "test:workspace-domain": "tsx scripts/test-workspace-domain.ts",
     "test:project-domain": "tsx scripts/test-project-domain.ts",
     "test:project-artifacts": "tsx scripts/test-project-artifacts.ts",
     "test:ai-gateway": "NODE_OPTIONS=--conditions=react-server tsx scripts/test-ai-gateway.ts",
     "test:prd-generation-route": "tsx scripts/test-prd-generation-route.ts",
     "test:e2e": "playwright test",
-    "test:unit": "npm run test:auth-identity && npm run test:auth-session-identity && npm run test:authenticated-db-boundary && npm run test:workspace-domain && npm run test:project-domain && npm run test:project-artifacts && npm run test:ai-gateway && npm run test:prd-generation-route",
+    "test:unit": "npm run test:auth-identity && npm run test:auth-session-identity && npm run test:authenticated-db-boundary && npm run test:current-user-transaction && npm run test:workspace-domain && npm run test:project-domain && npm run test:project-artifacts && npm run test:ai-gateway && npm run test:prd-generation-route",
     "test:coverage": "c8 npm run test:unit"
   },
   "dependencies": {

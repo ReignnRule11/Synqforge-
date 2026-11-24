@@ -76,6 +76,59 @@ async function run() {
   });
   assert.deepEqual(visibleToB, [workspaceB], "tenant B must not see workspace A after pooled connection reuse");
 
+  // Verify transaction-local role and identity are visible only inside the transaction.
+  const userBContext = await withAuthenticatedUserTransaction(runtime, userB, async (client) => {
+    const result = await client.query(
+      "SELECT session_user, current_user, current_setting('app.user_id', true) AS app_user_id",
+    );
+    return result.rows[0] as { session_user: string; current_user: string; app_user_id: string };
+  });
+  assert.equal(userBContext.session_user, "synqforge_test_runtime");
+  assert.equal(userBContext.current_user, "synqforge_app");
+  assert.equal(userBContext.app_user_id, userB, "transaction must expose only the verified tenant identity");
+
+  // A failed transaction must roll back both its data and its transaction-local context.
+  const rollbackSlug = "runtime-transaction-rollback";
+  await admin.query("DELETE FROM workspaces WHERE slug = $1", [rollbackSlug]);
+  const forcedFailure = new Error("forced runtime transaction failure");
+  await assert.rejects(
+    withAuthenticatedUserTransaction(runtime, userA, async (client) => {
+      await client.query("SELECT public.create_workspace($1, $2)", ["Must roll back", rollbackSlug]);
+      const context = await client.query(
+        "SELECT current_user, current_setting('app.user_id', true) AS app_user_id",
+      );
+      assert.equal(context.rows[0]?.current_user, "synqforge_app");
+      assert.equal(context.rows[0]?.app_user_id, userA);
+      throw forcedFailure;
+    }),
+    (error: unknown) => error === forcedFailure,
+  );
+  const rolledBackWorkspace = await admin.query(
+    "SELECT count(*)::int AS count FROM workspaces WHERE slug = $1",
+    [rollbackSlug],
+  );
+  assert.equal(rolledBackWorkspace.rows[0]?.count, 0, "failed runtime transaction must roll back inserted data");
+
+  // The single-connection pool must safely serve tenant B after tenant A rolls back.
+  const afterRollback = await withAuthenticatedUserTransaction(runtime, userB, async (client) => {
+    const result = await client.query(
+      "SELECT current_user, current_setting('app.user_id', true) AS app_user_id",
+    );
+    return result.rows[0] as { current_user: string; app_user_id: string };
+  });
+  assert.equal(afterRollback.current_user, "synqforge_app");
+  assert.equal(afterRollback.app_user_id, userB, "rollback must not leak tenant A identity into tenant B");
+
+  // After COMMIT/ROLLBACK, the pooled session must return to its restricted login role
+  // with no authenticated user identity left behind.
+  const idleContext = await runtime.query(
+    "SELECT session_user, current_user, current_setting('app.user_id', true) AS app_user_id",
+  );
+  assert.equal(idleContext.rows[0]?.session_user, "synqforge_test_runtime");
+  assert.equal(idleContext.rows[0]?.current_user, "synqforge_test_runtime");
+  assert.notEqual(idleContext.rows[0]?.app_user_id, userA);
+  assert.notEqual(idleContext.rows[0]?.app_user_id, userB);
+
   await assert.rejects(
     withAuthenticatedUserTransaction(runtime, userA, async (client) =>
       client.query("INSERT INTO workspace_memberships (workspace_id, user_id, role) VALUES ($1, $2, 'owner')", [workspaceA, userB]),
