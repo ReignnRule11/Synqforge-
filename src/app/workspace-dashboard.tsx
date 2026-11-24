@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { signOut } from "next-auth/react";
 import {
   Activity, ArrowUpRight, Atom, Blocks, Check, ChevronDown, CircleHelp,
@@ -74,6 +74,7 @@ export default function WorkspaceDashboard({ initialWorkspaces, userName, userEm
   const [artifactTitle, setArtifactTitle] = useState("");
   const [artifactContent, setArtifactContent] = useState('{"summary":"","problem":"","audience":"","solution":""}');
   const [artifactSaving, setArtifactSaving] = useState(false);
+  const pendingArtifactRequest = useRef<{ scope: string; key: string } | null>(null);
   const [prdProvider, setPrdProvider] = useState<{ provider: string; model: string } | null>(null);
   const [prdProviderError, setPrdProviderError] = useState("");
   const [prdConsent, setPrdConsent] = useState(false);
@@ -167,15 +168,20 @@ export default function WorkspaceDashboard({ initialWorkspaces, userName, userEm
     setArtifactSaving(true);
     setDetailError("");
     try {
+      const scope = `${selectedProject.id}:${artifactType}:${artifactTitle.trim()}:${JSON.stringify(content)}`;
+      if (!pendingArtifactRequest.current || pendingArtifactRequest.current.scope !== scope) {
+        pendingArtifactRequest.current = { scope, key: crypto.randomUUID() };
+      }
       const response = await fetch(`/api/projects/${encodeURIComponent(selectedProject.id)}/artifacts`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "Idempotency-Key": pendingArtifactRequest.current.key },
         body: JSON.stringify({ artifact_type: artifactType, title: artifactTitle, content }),
       });
       const payload = await response.json().catch(() => ({})) as { artifact?: Artifact; error?: string };
       if (!response.ok || !payload.artifact) throw new Error(payload.error || "Artifact could not be saved.");
       setArtifacts((current) => [payload.artifact!, ...current]);
       setArtifactTitle("");
+      pendingArtifactRequest.current = null;
       setNotice(`Saved ${payload.artifact.artifact_type} version ${payload.artifact.version}.`);
     } catch (cause) {
       setDetailError(cause instanceof Error ? cause.message : "Artifact could not be saved.");
