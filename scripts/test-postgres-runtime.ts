@@ -9,6 +9,7 @@ if (!runtimeUrl) throw new Error("DATABASE_URL must use the dedicated runtime lo
 
 const admin = new Pool({ connectionString: adminUrl, max: 1 });
 const runtime = new Pool({ connectionString: runtimeUrl, max: 1 });
+const concurrentRuntime = new Pool({ connectionString: runtimeUrl, max: 2 });
 
 const userA = "20000000-0000-4000-8000-000000000001";
 const userB = "20000000-0000-4000-8000-000000000005";
@@ -217,6 +218,88 @@ async function run() {
   });
   assert.equal(firstArtifact.version, 1, "first artifact version is one");
 
+  // A failed artifact write must not leave either the immutable version or its activity event.
+  const rollbackArtifactTitle = "Artifact rollback verification";
+  await assert.rejects(
+    withAuthenticatedUserTransaction(runtime, userA, async (client) => {
+      const inserted = await client.query(
+        `INSERT INTO project_artifacts (workspace_id, project_id, artifact_type, title, version, content, created_by)
+         VALUES ($1, $2, 'test_report', $3, 1, '{"state":"must-rollback"}'::jsonb, current_setting('app.user_id')::uuid)
+         RETURNING id`,
+        [workspaceA, ownerProject.id, rollbackArtifactTitle],
+      );
+      await client.query(
+        `INSERT INTO project_activity (workspace_id, project_id, actor_id, event_type, summary, metadata)
+         VALUES ($1, $2, current_setting('app.user_id')::uuid, 'artifact.version_created', $3, $4::jsonb)`,
+        [workspaceA, ownerProject.id, rollbackArtifactTitle, JSON.stringify({ artifact_id: inserted.rows[0].id })],
+      );
+      throw new Error("forced artifact transaction failure");
+    }),
+    /forced artifact transaction failure/,
+  );
+  const rolledBackArtifact = await admin.query(
+    "SELECT count(*)::int AS count FROM project_artifacts WHERE project_id = $1 AND title = $2",
+    [ownerProject.id, rollbackArtifactTitle],
+  );
+  assert.equal(rolledBackArtifact.rows[0]?.count, 0, "artifact insert must roll back with transaction");
+  const rolledBackActivity = await admin.query(
+    "SELECT count(*)::int AS count FROM project_activity WHERE project_id = $1 AND summary = $2",
+    [ownerProject.id, rollbackArtifactTitle],
+  );
+  assert.equal(rolledBackActivity.rows[0]?.count, 0, "activity event must roll back with artifact insert");
+
+  // Two concurrent writers serialize version allocation using the same transaction-scoped advisory lock.
+  const concurrentArtifactType = "test_report";
+  const appendConcurrentArtifact = (title: string) =>
+    withAuthenticatedUserTransaction(concurrentRuntime, userA, async (client) => {
+      await client.query(
+        "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+        [`${ownerProject.id}:${concurrentArtifactType}`],
+      );
+      const next = await client.query(
+        "SELECT COALESCE(MAX(version), 0) + 1 AS next_version FROM project_artifacts WHERE project_id = $1 AND artifact_type = $2",
+        [ownerProject.id, concurrentArtifactType],
+      );
+      const version = Number(next.rows[0].next_version);
+      const inserted = await client.query(
+        `INSERT INTO project_artifacts (workspace_id, project_id, artifact_type, title, version, content, created_by)
+         VALUES ($1, $2, $3, $4, $5, $6::jsonb, current_setting('app.user_id')::uuid)
+         RETURNING id, version`,
+        [workspaceA, ownerProject.id, concurrentArtifactType, title, version, JSON.stringify({ title })],
+      );
+      await client.query(
+        `INSERT INTO project_activity (workspace_id, project_id, actor_id, event_type, summary, metadata)
+         VALUES ($1, $2, current_setting('app.user_id')::uuid, 'artifact.version_created', $3, $4::jsonb)`,
+        [workspaceA, ownerProject.id, title, JSON.stringify({ artifact_id: inserted.rows[0].id, version })],
+      );
+      return inserted.rows[0] as { id: string; version: number };
+    });
+  const concurrentResults = await Promise.all([
+    appendConcurrentArtifact("Concurrent report A"),
+    appendConcurrentArtifact("Concurrent report B"),
+  ]);
+  assert.deepEqual(
+    concurrentResults.map((item) => item.version).sort((a, b) => a - b),
+    [1, 2],
+    "concurrent writers must receive distinct sequential versions",
+  );
+  const concurrentEvents = await admin.query(
+    `SELECT a.version, COUNT(e.id)::int AS event_count
+     FROM project_artifacts a
+     LEFT JOIN project_activity e
+       ON e.project_id = a.project_id
+      AND e.event_type = 'artifact.version_created'
+      AND (e.metadata->>'artifact_id')::text = a.id::text
+     WHERE a.project_id = $1 AND a.artifact_type = $2
+     GROUP BY a.version ORDER BY a.version`,
+    [ownerProject.id, concurrentArtifactType],
+  );
+  assert.deepEqual(
+    concurrentEvents.rows.map((row) => ({ version: row.version, event_count: row.event_count })),
+    [{ version: 1, event_count: 1 }, { version: 2, event_count: 1 }],
+    "each committed artifact version must have exactly one corresponding activity event",
+  );
+
   const memberArtifact = await withAuthenticatedUserTransaction(runtime, memberUser, async (client) => {
     const result = await client.query(
       `INSERT INTO project_artifacts (workspace_id, project_id, artifact_type, title, version, content, created_by)
@@ -358,5 +441,6 @@ run()
   })
   .finally(async () => {
     await runtime.end();
+    await concurrentRuntime.end();
     await admin.end();
   });
