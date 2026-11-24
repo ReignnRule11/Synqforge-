@@ -19,8 +19,9 @@ test("workspace API rejects unauthenticated access with JSON", async ({ request 
 const userAState = process.env.E2E_USER_A_STORAGE_STATE;
 const userBState = process.env.E2E_USER_B_STORAGE_STATE;
 const projectId = process.env.E2E_USER_A_PROJECT_ID;
+const baseURL = process.env.E2E_BASE_URL ?? "http://127.0.0.1:3000";
 
-test("a second authenticated user cannot read the first user's project", async ({ browser, baseURL }) => {
+test("a second authenticated user cannot read the first user's project", async ({ browser }) => {
   test.skip(
     !userAState || !userBState || !projectId,
     "Configure two dedicated test-user storage states and E2E_USER_A_PROJECT_ID to enable the authenticated tenant-isolation check.",
