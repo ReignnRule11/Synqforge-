@@ -46,7 +46,7 @@
 - [ ] Browser E2E against deployed application with live Auth.js and PostgreSQL
 - [x] CI secret scanning via Gitleaks on pull requests, main pushes, and a weekly schedule
 - [ ] Enable and verify GitHub native secret-scanning alerts and push protection
-- [ ] Enable the repository dependency graph and verify Dependency Review on a pull request
+- [x] Dependency Review workflow verified successfully on PR #32
 - [ ] Bounded repair iterations with explicit diffs and approval gates
 - [ ] Coverage instrumentation and enforced thresholds after adopting a compatible coverage runner
 
