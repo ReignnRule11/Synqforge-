@@ -40,7 +40,7 @@ The browser does not supply identity or role. PostgreSQL RLS remains authoritati
 
 ## Live verification boundary
 
-Automated CI exercises identity mapping, session-to-database boundaries, authorization logic, and PostgreSQL RLS using deterministic tests. It does not prove that a deployed GitHub OAuth exchange succeeds or that a live database/provider is configured correctly. Follow [the PRD generation verification runbook](PRD_GENERATION_VERIFICATION.md) in a non-production environment with synthetic data before treating the external integration as live-verified.
+Automated CI exercises identity mapping, session-to-database boundaries, authorization logic, and PostgreSQL RLS using deterministic tests. The PostgreSQL runtime suite composes the same current-user transaction factory used by the server-only Auth.js adapter with a deterministic verified-session fixture, then verifies transaction-local identity and RLS against a real PostgreSQL service. This validates the adapter-to-database wiring, but it does not execute a real Auth.js cookie/JWT verification or prove that a deployed GitHub OAuth exchange succeeds. Deployed OAuth and authenticated browser verification remain separate release gates. Follow [the PRD generation verification runbook](PRD_GENERATION_VERIFICATION.md) in a non-production environment with synthetic data before treating the external integration as live-verified.
 
 ## Current limitations
 
