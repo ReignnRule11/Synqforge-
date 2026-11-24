@@ -32,6 +32,9 @@ function setup(options: { missingProject?: boolean; failActivityOnce?: boolean }
         const record = idempotency.get(key);
         return { rows: record ? [record] : [] };
       }
+      if (sql.includes("FROM project_artifacts") && sql.includes("ORDER BY")) {
+        return { rows: artifacts };
+      }
       if (sql.includes("FROM project_artifacts WHERE id = $1")) {
         const found = artifacts.find((item) => item.id === values[0]);
         return { rows: found ? [found] : [] };
